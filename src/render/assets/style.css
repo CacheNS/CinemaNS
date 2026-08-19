@@ -228,6 +228,7 @@ main {
 
 .badge--variant { color: var(--text); }
 .badge--dubbed { color: var(--dub); border-color: rgba(110, 231, 168, 0.35); }
+.badge--original { color: #c4b5fd; border-color: rgba(196, 181, 253, 0.35); }
 
 .badge--runtime { font-weight: 600; }
 .badge--runtime-short {
@@ -296,6 +297,7 @@ main {
 .showtime__time { font-size: 0.92rem; font-weight: 600; }
 .showtime__meta { font-size: 0.65rem; color: var(--muted); }
 .showtime--dubbed { border-color: rgba(110, 231, 168, 0.35); }
+.showtime--original { border-color: rgba(196, 181, 253, 0.35); }
 
 .footer {
   max-width: 1080px;

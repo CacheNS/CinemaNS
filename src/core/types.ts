@@ -30,7 +30,11 @@ export const CINEMAS: Record<CinemaId, Cinema> = {
 
 export const CINEMA_IDS: CinemaId[] = ['arena', 'cineplexx', 'cinestar'];
 
-export type Audio = 'dubbed' | 'subtitled' | 'unknown';
+/**
+ * `original` is a domestic film playing in Serbian: neither dubbed nor
+ * subtitled, which is what a "titlovano" label would wrongly imply.
+ */
+export type Audio = 'dubbed' | 'subtitled' | 'original' | 'unknown';
 
 export interface Showtime {
   cinemaId: CinemaId;
@@ -60,6 +64,8 @@ export interface RawMovie {
   runtimeMinutes?: number;
   /** Genres as published by the cinema; used when TMDb is unavailable. */
   genres?: string[];
+  /** ISO country code of production, when the cinema publishes one. */
+  originCountry?: string;
   detailUrl?: string;
   showtimes: Showtime[];
 }

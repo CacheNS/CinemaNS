@@ -117,3 +117,52 @@ test('showtimes are sorted chronologically', async () => {
   const { movies } = await mergeMovies([unsorted], offlineTmdb());
   assert.deepEqual(movies[0]!.showtimes.map((s) => s.time), ['09:30', '22:00']);
 });
+
+test('a labelled original title beats one scraped positionally', async () => {
+  const { movies } = await mergeMovies(
+    [
+      // Arena has no original title for this film, so its page shows the
+      // director in that position instead.
+      raw('arena', 'ASTRALNA PODMUKLOST', 'ASTRALNA PODMUKLOST', {
+        originalTitle: 'Jacob Chase',
+      }),
+      raw('cinestar', 'Astralna podmuklost', 'Astralna podmuklost', {
+        originalTitle: 'Insidious: Out of the Further',
+      }),
+    ],
+    offlineTmdb(),
+  );
+
+  assert.equal(movies.length, 1);
+  assert.equal(movies[0]?.originalTitle, 'Insidious: Out of the Further');
+});
+
+test('an exact running time beats a rounded one', async () => {
+  const { movies } = await mergeMovies(
+    [
+      raw('arena', 'SPAJDERMEN', 'SPAJDERMEN', { runtimeMinutes: 150 }),
+      raw('cineplexx', 'Spajdermen', 'Spider-Man', { runtimeMinutes: 145 }),
+    ],
+    offlineTmdb(),
+  );
+
+  assert.equal(movies[0]?.runtimeMinutes, 145);
+});
+
+test('a domestic film is neither dubbed nor subtitled', async () => {
+  const { movies } = await mergeMovies(
+    [
+      raw('arena', 'HAJDUK U BEOGRADU DS', 'HAJDUK U BEOGRADU', { originCountry: 'RS' }),
+      raw('cinestar', 'Hajduk u Beogradu', 'Hajduk u Beogradu'),
+    ],
+    offlineTmdb(),
+  );
+
+  assert.equal(movies.length, 1);
+  assert.ok(movies[0]?.showtimes.length);
+  // The label must be consistent even for the cinema that said nothing.
+  assert.ok(movies[0]?.showtimes.every((s) => s.audio === 'original'));
+
+  const foreign = await mergeMovies([raw('arena', 'THE ODYSSEY', 'THE ODYSSEY')], offlineTmdb());
+  assert.ok(foreign.movies[0]?.showtimes.every((s) => s.audio === 'subtitled'));
+});

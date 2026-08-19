@@ -1,10 +1,29 @@
 import { cleanTitle, normalizeTitle, similarity, tidyDisplayTitle } from './titles.js';
 import { isKidFriendly, resolveAgeRating } from './ratings.js';
-import type { Diagnostics, Movie, RawMovie, Showtime } from './types.js';
+import type { CinemaId, Diagnostics, Movie, RawMovie, Showtime } from './types.js';
 import { TmdbClient, type TmdbMovie } from '../tmdb/client.js';
 
 /** Two cinema titles below this similarity are treated as different films. */
 const FUZZY_THRESHOLD = 0.82;
+
+/**
+ * How far each cinema's film metadata (original title, running time) can be
+ * trusted. Cineplexx serves it from a structured API, CineStar labels the
+ * fields explicitly, and Arena is scraped positionally out of prose — where a
+ * missing original title leaves the director sitting in its place.
+ */
+const METADATA_TRUST: Record<CinemaId, number> = {
+  cineplexx: 0,
+  cinestar: 1,
+  arena: 2,
+};
+
+function byMetadataTrust(raws: RawMovie[]): RawMovie[] {
+  return [...raws].sort((a, b) => METADATA_TRUST[a.cinemaId] - METADATA_TRUST[b.cinemaId]);
+}
+
+/** Productions whose original language is Serbian, so they play untranslated. */
+const DOMESTIC_COUNTRIES = new Set(['RS', 'SRB', 'SR']);
 
 interface Group {
   key: string;
@@ -132,7 +151,14 @@ export async function mergeMovies(
   let unknownAudioShowtimes = 0;
 
   const movies: Movie[] = groups.map((group) => {
-    const showtimes = sortShowtimes(group.raws.flatMap((raw) => raw.showtimes));
+    // A domestic film plays in Serbian, so "titlovano" would be wrong for it
+    // no matter which cinema reported the screening.
+    const domestic = group.raws.some((raw) => DOMESTIC_COUNTRIES.has(raw.originCountry ?? ''));
+    const showtimes = sortShowtimes(group.raws.flatMap((raw) => raw.showtimes)).map((showtime) =>
+      domestic && showtime.audio === 'subtitled'
+        ? { ...showtime, audio: 'original' as const }
+        : showtime,
+    );
     unknownAudioShowtimes += showtimes.filter((s) => s.audio === 'unknown').length;
 
     const hasDubbed = showtimes.some((showtime) => showtime.audio === 'dubbed');
@@ -175,12 +201,14 @@ export async function mergeMovies(
     if (poster) movie.posterUrl = poster;
 
     if (!movie.originalTitle) {
-      // Arena and Cineplexx both print the original (usually English) title
-      // next to the Serbian one, which is worth showing even without TMDb.
+      // Cineplexx and CineStar publish the original title in a labelled field,
+      // so they are trusted first. Arena only prints it positionally before the
+      // running time and sometimes puts the director there instead, which is
+      // why it is the last resort rather than whichever cinema comes first.
       const displayKey = normalizeTitle(movie.title);
       const candidates = [
-        ...group.raws.map((raw) => raw.originalTitle?.trim()),
-        ...group.raws.map((raw) => raw.cleanTitle?.trim()),
+        ...byMetadataTrust(group.raws).map((raw) => raw.originalTitle?.trim()),
+        ...byMetadataTrust(group.raws).map((raw) => raw.cleanTitle?.trim()),
       ];
       const original = candidates
         .filter((candidate): candidate is string => Boolean(candidate))
@@ -193,8 +221,11 @@ export async function mergeMovies(
       group.tmdb?.overview || group.raws.find((raw) => raw.synopsis)?.synopsis;
     if (synopsis) movie.synopsis = synopsis;
 
+    // Arena rounds its running times (150 for a 145 minute film), so a cinema
+    // that reports an exact figure wins.
     const runtime =
-      group.tmdb?.runtimeMinutes ?? group.raws.find((raw) => raw.runtimeMinutes)?.runtimeMinutes;
+      group.tmdb?.runtimeMinutes ??
+      byMetadataTrust(group.raws).find((raw) => raw.runtimeMinutes)?.runtimeMinutes;
     if (runtime) movie.runtimeMinutes = runtime;
 
     return movie;

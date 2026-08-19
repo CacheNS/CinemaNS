@@ -83,6 +83,36 @@ export function parseArenaOriginalTitle(html: string): string | undefined {
 }
 
 /**
+ * Arena prints "Zemlja porekla: RS" in the film details. A domestic film is
+ * shown in Serbian, so it is neither dubbed nor subtitled.
+ */
+export function parseArenaOriginCountry(html: string): string | undefined {
+  const value = labelledValue(html, 'Zemlja porekla');
+  const match = value ? /^[A-Za-z]{2,3}/.exec(value) : null;
+  return match ? match[0].toUpperCase() : undefined;
+}
+
+/**
+ * Arena's detail block is a list of `<strong>Label:</strong>value` rows. The
+ * rows carry no whitespace between them, so reading the label's own container
+ * is the only way to know where a value ends.
+ */
+function labelledValue(html: string, label: string): string | undefined {
+  const $ = cheerio.load(html);
+  let value: string | undefined;
+  $('strong').each((_, element) => {
+    if (value !== undefined) return;
+    const strong = $(element);
+    if (!strong.text().replace(/\s+/g, ' ').trim().startsWith(label)) return;
+    const row = strong.parent().clone();
+    row.find('strong').remove();
+    const text = row.text().replace(/\s+/g, ' ').trim();
+    if (text) value = text;
+  });
+  return value;
+}
+
+/**
  * Arena prints "Trajanje: 105 min" on the film page, sometimes with the number
  * missing entirely, which is why the match is optional.
  */
@@ -174,6 +204,7 @@ export async function scrapeArena(days: string[]): Promise<AdapterResult> {
       return {
         title: listing.title ?? parseArenaTitle(html),
         originalTitle: parseArenaOriginalTitle(html),
+        originCountry: parseArenaOriginCountry(html),
         runtimeMinutes: parseArenaRuntime(html),
         showtimes: parseArenaShowtimes(html, listing, days),
       };
@@ -181,6 +212,7 @@ export async function scrapeArena(days: string[]): Promise<AdapterResult> {
       return {
         title: listing.title,
         originalTitle: undefined,
+        originCountry: undefined,
         runtimeMinutes: undefined,
         showtimes: [] as Showtime[],
       };
@@ -203,6 +235,7 @@ export async function scrapeArena(days: string[]): Promise<AdapterResult> {
     };
     if (listing.posterUrl) movie.posterUrl = listing.posterUrl;
     if (result.originalTitle) movie.originalTitle = result.originalTitle;
+    if (result.originCountry) movie.originCountry = result.originCountry;
     if (result.runtimeMinutes) movie.runtimeMinutes = result.runtimeMinutes;
     movies.push(movie);
   });

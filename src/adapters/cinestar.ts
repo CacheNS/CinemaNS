@@ -33,12 +33,22 @@ export function audioFromFormatCode(code: string): Audio {
 
 export function formatFromCode(code: string): string {
   const parts = code.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
-  if (parts.includes('4DX')) return '4DX';
-  if (parts.includes('SCREENX')) return 'ScreenX';
-  if (parts.includes('IMAX')) return 'IMAX';
-  if (parts.includes('3D')) return '3D';
-  if (parts.includes('GOLD')) return 'Gold';
-  return '2D';
+
+  // A screening can be both a premium format and 3D ("4DX/3D/TITL"), and the
+  // glasses are the part people care about, so neither may be dropped.
+  const premium = parts.includes('4DX')
+    ? '4DX'
+    : parts.includes('SCREENX')
+      ? 'ScreenX'
+      : parts.includes('IMAX')
+        ? 'IMAX'
+        : parts.includes('GOLD')
+          ? 'Gold'
+          : undefined;
+
+  const dimension = parts.includes('3D') ? '3D' : undefined;
+  if (premium && dimension) return `${premium} 3D`;
+  return premium ?? dimension ?? '2D';
 }
 
 export function parseCinestar(html: string, days: string[]): RawMovie[] {

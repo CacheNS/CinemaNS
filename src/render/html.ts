@@ -21,6 +21,8 @@ function audioLabel(audio: Showtime['audio']): string {
       return 'sinhronizovano';
     case 'subtitled':
       return 'titlovano';
+    case 'original':
+      return 'domaći film';
     default:
       return 'nije naznačeno';
   }
@@ -33,6 +35,8 @@ function audioShort(audio: Showtime['audio']): string {
       return 'sinh.';
     case 'subtitled':
       return 'titl.';
+    case 'original':
+      return 'dom.';
     default:
       return '?';
   }

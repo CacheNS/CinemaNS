@@ -80,3 +80,11 @@ test('film page links are absolute so they can be fetched', () => {
     assert.match(movie.detailUrl ?? '', /^https:\/\/cinestarcinemas\.rs\//);
   }
 });
+
+test('a premium format keeps its 3D', () => {
+  assert.equal(formatFromCode('4DX/3D/TITL'), '4DX 3D');
+  assert.equal(formatFromCode('4DX/TITL'), '4DX');
+  assert.equal(formatFromCode('3D/TITL'), '3D');
+  assert.equal(formatFromCode('SCREENX/3D/TITL'), 'ScreenX 3D');
+  assert.equal(formatFromCode('TITL'), '2D');
+});

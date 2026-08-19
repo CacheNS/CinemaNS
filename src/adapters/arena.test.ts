@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   parseArenaListings,
+  parseArenaOriginCountry,
   parseArenaOriginalTitle,
   parseArenaRuntime,
   parseArenaShowtimes,
@@ -79,4 +80,15 @@ test('reads the running time, tolerating the empty field Arena often leaves', ()
     128,
   );
   assert.equal(parseArenaRuntime('<html><body>Trajanje: 5 min</body></html>'), undefined);
+});
+
+test('reads the country of production', () => {
+  // The real page renders sibling rows with no whitespace between them, so the
+  // value runs straight into the next label.
+  const html =
+    '<body><div class="d"><div><strong>Distributer:&nbsp;</strong>MegaCom Film</div>' +
+    '<div><strong>Zemlja porekla:&nbsp;</strong>RS</div>' +
+    '<div><strong>Godina proizvodnje:&nbsp;</strong>2025</div></div></body>';
+  assert.equal(parseArenaOriginCountry(html), 'RS');
+  assert.equal(parseArenaOriginCountry('<body>nema podataka</body>'), undefined);
 });
