@@ -166,3 +166,57 @@ test('a domestic film is neither dubbed nor subtitled', async () => {
   const foreign = await mergeMovies([raw('arena', 'THE ODYSSEY', 'THE ODYSSEY')], offlineTmdb());
   assert.ok(foreign.movies[0]?.showtimes.every((s) => s.audio === 'subtitled'));
 });
+
+/**
+ * Resolves only the listings whose cleanTitle is in `known`, which is what real
+ * TMDb resolution looks like: it is per-listing, so one cinema's spelling of a
+ * film can resolve while another's does not.
+ */
+function partialTmdb(known: Record<string, number>): TmdbClient {
+  const client = new TmdbClient(undefined);
+  client.resolve = async (lookup: { cleanTitle: string }) => {
+    const id = known[lookup.cleanTitle];
+    if (id === undefined) return null;
+    return {
+      id,
+      title: lookup.cleanTitle,
+      originalTitle: lookup.cleanTitle,
+      genres: [],
+      adult: false,
+      certifications: {},
+    } as never;
+  };
+  return client;
+}
+
+test('a film is not split when only one cinema listing resolves to TMDb', async () => {
+  // Enabling TMDb once *increased* the film count, because an unresolved
+  // listing was only ever matched against other unresolved groups.
+  const { movies } = await mergeMovies(
+    [
+      raw('cineplexx', 'Spajdermen: Novi Dan', 'Spider-Man: Brand New Day'),
+      raw('arena', 'SPAJDERMEN:NOVI DAN 3D', 'SPAJDERMEN:NOVI DAN'),
+    ],
+    partialTmdb({ 'Spider-Man: Brand New Day': 1234 }),
+  );
+
+  assert.equal(movies.length, 1);
+  assert.equal(movies[0]?.tmdbId, 1234);
+  assert.deepEqual(
+    [...new Set(movies[0]!.showtimes.map((s) => s.cinemaId))].sort(),
+    ['arena', 'cineplexx'],
+  );
+});
+
+test('the unresolved listing may arrive first and still be adopted', async () => {
+  const { movies } = await mergeMovies(
+    [
+      raw('arena', 'SPAJDERMEN:NOVI DAN 3D', 'SPAJDERMEN:NOVI DAN'),
+      raw('cineplexx', 'Spajdermen: Novi Dan', 'Spider-Man: Brand New Day'),
+    ],
+    partialTmdb({ 'Spider-Man: Brand New Day': 1234 }),
+  );
+
+  assert.equal(movies.length, 1);
+  assert.equal(movies[0]?.tmdbId, 1234, 'the group must adopt the id it later learned');
+});

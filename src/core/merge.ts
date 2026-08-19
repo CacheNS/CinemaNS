@@ -116,6 +116,20 @@ export async function mergeMovies(
         existing.normalizedKeys.push(...keys);
         continue;
       }
+      // A title that resolves now may already have arrived unresolved from
+      // another cinema, so adopt that group rather than starting a second one.
+      const orphan = groups.find(
+        (group) => group.tmdb === null && matches(group.normalizedKeys, keys),
+      );
+      if (orphan) {
+        orphan.key = `tmdb:${tmdb.id}`;
+        orphan.tmdb = tmdb;
+        orphan.raws.push(raw);
+        orphan.normalizedKeys.push(...keys);
+        byTmdbId.set(tmdb.id, orphan);
+        continue;
+      }
+
       const group: Group = {
         key: `tmdb:${tmdb.id}`,
         tmdb,
@@ -131,9 +145,11 @@ export async function mergeMovies(
 
     // No TMDb id: fall back to fuzzy title matching so the app still merges
     // sensibly when the key is missing or a local title is unknown to TMDb.
-    const match = groups.find(
-      (group) => group.tmdb === null && matches(group.normalizedKeys, keys),
-    );
+    // This deliberately considers TMDb-backed groups too. Resolution is
+    // per-listing, so one cinema's spelling can resolve while another's does
+    // not; matching only unresolved groups would then split one film across two
+    // cards — which is how enabling TMDb briefly *increased* the film count.
+    const match = groups.find((group) => matches(group.normalizedKeys, keys));
     if (match) {
       match.raws.push(raw);
       match.normalizedKeys.push(...keys);
