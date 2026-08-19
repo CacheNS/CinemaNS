@@ -1,12 +1,11 @@
 import { fetchJson, mapLimit } from '../core/http.js';
 import { cleanTitle, detectAudio, detectFormat } from '../core/titles.js';
-import type { AdapterResult, RawMovie, Showtime } from '../core/types.js';
+import type { AdapterResult, CinemaId, RawMovie, Showtime } from '../core/types.js';
 
 const API_BASE = 'https://app.cineplexx.rs/api/v1';
 const SITE_BASE = 'https://www.cineplexx.rs';
 const CLIENT_KEY =
   process.env['CINEPLEXX_CLIENT_KEY'] ?? '308330b1-52a5-4883-aee3-304240c22ea1';
-const NOVI_SAD_URL_NAME = 'CINEPLEXX-NOVI-SAD';
 
 const HEADERS = {
   'CINEPLEXX-Platform': 'WEB',
@@ -71,11 +70,23 @@ function toLocalParts(isoWithOffset: string): { date: string; time: string } | n
   return { date: match[1]!, time: `${match[2]}:${match[3]}` };
 }
 
-export async function scrapeCineplexx(days: string[]): Promise<AdapterResult> {
+/**
+ * Scrapes one Cineplexx venue.
+ *
+ * The numeric cinema id is always resolved from `/cinemas` by `cinemaUrlName`
+ * rather than hardcoded: the published ids are not contiguous (1114 and 1117 do
+ * not exist), so they are assigned rather than derived and nothing promises
+ * they stay put.
+ */
+export async function scrapeCineplexx(
+  days: string[],
+  cinemaId: CinemaId,
+  urlName: string,
+): Promise<AdapterResult> {
   const cinemas = await fetchJson<ApiCinema[]>(`${API_BASE}/cinemas`, { headers: HEADERS });
-  const cinema = cinemas.find((c) => c.cinemaUrlName === NOVI_SAD_URL_NAME);
+  const cinema = cinemas.find((c) => c.cinemaUrlName === urlName);
   if (!cinema) {
-    throw new Error(`Cineplexx: cinema ${NOVI_SAD_URL_NAME} not found in /cinemas`);
+    throw new Error(`Cineplexx: cinema ${urlName} not found in /cinemas`);
   }
 
   const sessionDays = await fetchJson<ApiSessionDay[]>(
@@ -127,7 +138,7 @@ export async function scrapeCineplexx(days: string[]): Promise<AdapterResult> {
     const audio = flags.length > 0 ? 'dubbed' : detectAudio(rawTitle) === 'dubbed' ? 'dubbed' : 'subtitled';
 
     const showtime: Showtime = {
-      cinemaId: 'cineplexx',
+      cinemaId,
       date: parts.date,
       time: parts.time,
       format: detectFormat(formats.join(' ')),
@@ -135,14 +146,14 @@ export async function scrapeCineplexx(days: string[]): Promise<AdapterResult> {
       hall: session.screenName,
       bookingUrl: movie?.shortURL
         ? `${SITE_BASE}/movie/${movie.shortURL}`
-        : `${SITE_BASE}/cinemas/${NOVI_SAD_URL_NAME}?date=all`,
+        : `${SITE_BASE}/cinemas/${urlName}?date=all`,
     };
     if (flags.length) showtime.languageTag = 'sinhronizovano';
 
     let entry = byMovie.get(session.movieId);
     if (!entry) {
       entry = {
-        cinemaId: 'cineplexx',
+        cinemaId,
         rawTitle,
         cleanTitle: cleanTitle(movie?.titleOriginalCalculated || rawTitle),
         showtimes: [],
@@ -168,5 +179,5 @@ export async function scrapeCineplexx(days: string[]): Promise<AdapterResult> {
     entry.showtimes.push(showtime);
   }
 
-  return { cinemaId: 'cineplexx', movies: [...byMovie.values()] };
+  return { cinemaId, movies: [...byMovie.values()] };
 }

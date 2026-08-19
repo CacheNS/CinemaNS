@@ -1,9 +1,9 @@
 ---
 name: cinema-requirements
-description: Baseline requirements and hard-won data-accuracy rules for the Novi Sad cinema aggregator. Use before changing anything in this repository — scrapers/adapters (Arena, Cineplexx, CineStar), title matching, TMDb enrichment, age ratings, dubbing/subtitling labels, filters, the rendered HTML/CSS, the PWA install flow, or the hourly GitHub Actions build.
+description: Baseline requirements and hard-won data-accuracy rules for Kokice, the Novi Sad + Beograd cinema aggregator. Use before changing anything in this repository — scrapers/adapters (Arena, Cineplexx, CineStar), title matching, TMDb enrichment, age ratings, dubbing/subtitling labels, filters, the city switcher, the rendered HTML/CSS, the PWA install flow, or the hourly GitHub Actions build.
 ---
 
-# Novi Sad cinema aggregator — requirements baseline
+# Kokice (Novi Sad + Beograd cinema aggregator) — requirements baseline
 
 ## Read this first
 
@@ -17,8 +17,8 @@ Requirements have stable ids (`R-10.3`). Cite them when a change touches them.
 ## Orientation
 
 Static site → built hourly by GitHub Actions → served by GitHub Pages. A
-Node.js + TypeScript build scrapes three cinemas in parallel, enriches via TMDb,
-merges by movie, and emits one Serbian HTML page per day plus `data.json`.
+Node.js + TypeScript build scrapes nine venues across two cities in parallel,
+enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus `data.json`.
 
 | Area | Where | Spec |
 |---|---|---|
@@ -28,6 +28,7 @@ merges by movie, and emits one Serbian HTML page per day plus `data.json`.
 | TMDb + age | `src/tmdb/client.ts`, `src/core/ratings.ts` | §6 |
 | Rendering | `src/render/html.ts`, `assets/style.css` | §8 |
 | Filters | `src/render/assets/app.js` | §7 |
+| City switch | `src/core/types.ts` (registry), `html.ts`, `app.js` | §1, §7b |
 | PWA | `src/render/icon.ts`, `sw.js` | §9 |
 | Build/deploy | `src/build.ts`, `.github/workflows/build.yml` | §3, §13 |
 | Trailers | `src/core/trailer.ts`, `src/tmdb/client.ts` | §8.10–8.11 |
@@ -69,12 +70,26 @@ merges by movie, and emits one Serbian HTML page per day plus `data.json`.
     diacritics and exists only for matching. The conversion is not cosmetic —
     Cyrillic genres matched nothing in the Latin-only `ADULT_GENRES`, so the
     age heuristic was silently returning no estimate (§10.12).
+15. **`CinemaId` is a venue, not a chain** (§4.7). Beograd has five Cineplexx
+    venues; a chain-level id would merge Delta City with Galerija into one
+    block. Chain-level facts such as metadata trust key on `Cinema.chain`
+    (§4.8).
+16. **Cineplexx venue numbers are resolved from `/api/v1/cinemas` by
+    `cinemaUrlName`, never hardcoded** (§4.10) — the live ids are
+    non-contiguous (`1114` and `1117` do not exist), so a guessed id quietly
+    scrapes the wrong cinema.
+17. **Every city but the default renders pre-hidden, and JS only reveals**
+    (§7b.4). This is the one place a no-JS superset is *wrong* rather than
+    merely broad: a Novi Sad reader must never see Belgrade showtimes. Counts,
+    empty state, subtitle and stale-source notices are all per city (§7b.5).
+18. **Arena exists only in Novi Sad** (§1.2.1) — its site has no location
+    selector at all. Do not try to parameterize it by city.
 
 ## Before committing
 
 ```
 npx tsc --noEmit
-npm test          # 91 tests, fixtures only, no network
+npm test          # 102 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```
@@ -98,3 +113,12 @@ parser was broken against the live page (§12.3).
 - The site is deployed and live at <https://cachens.github.io/CinemaNS/>,
   built and pushed hourly by Actions (§14.3).
 - Cloudflare Web Analytics is enabled via the `CF_BEACON_TOKEN` variable (§16).
+- **The repository is deliberately still named `CinemaNS` even though the app is
+  called Kokice** (§13.8). Renaming it would change the Pages URL, break
+  bookmarks, orphan installed PWA copies and reset the analytics history — for a
+  URL that still would not be `kokice.org`. The rename waits for the domain move
+  and happens once.
+- **Both cities share one page on purpose** (§7b.2). The payload objection was
+  measured, not assumed: pages gzip 11–14× and GitHub Pages serves gzip, so both
+  cities are ~18 KB over the wire. The known cost is SEO — one page cannot have
+  a city-specific `<title>` (§7b.9).

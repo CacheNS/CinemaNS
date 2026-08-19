@@ -178,7 +178,7 @@ export function parseArenaShowtimes(
           .match(/Sala:\s*([^\s]+)/i)?.[1];
 
         const showtime: Showtime = {
-          cinemaId: 'arena',
+          cinemaId: 'arena-novi-sad',
           date,
           time,
           format,
@@ -227,7 +227,7 @@ export async function scrapeArena(days: string[]): Promise<AdapterResult> {
     if (!rawTitle) return;
 
     const movie: RawMovie = {
-      cinemaId: 'arena',
+      cinemaId: 'arena-novi-sad',
       rawTitle,
       cleanTitle: cleanTitle(rawTitle),
       detailUrl: listing.url,
@@ -240,5 +240,5 @@ export async function scrapeArena(days: string[]): Promise<AdapterResult> {
     movies.push(movie);
   });
 
-  return { cinemaId: 'arena', movies };
+  return { cinemaId: 'arena-novi-sad', movies };
 }

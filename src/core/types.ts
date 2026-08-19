@@ -1,34 +1,175 @@
-export type CinemaId = 'arena' | 'cineplexx' | 'cinestar';
+/**
+ * A cinema *venue*, not a chain. In Novi Sad each chain happens to have exactly
+ * one venue, which is why an earlier version could get away with using the
+ * chain name as the id. Beograd has five Cineplexx venues, so conflating the
+ * two would merge Delta City and Galerija into a single block and present their
+ * showtimes as if they were the same building.
+ */
+export type CinemaId =
+  | 'arena-novi-sad'
+  | 'cineplexx-novi-sad'
+  | 'cinestar-novi-sad'
+  | 'cineplexx-delta-city'
+  | 'cineplexx-usce'
+  | 'cineplexx-big-beograd'
+  | 'cineplexx-beo'
+  | 'cineplexx-galerija'
+  | 'cinestar-beograd-ada';
+
+/** The operator. Metadata trust is a property of the chain, not the venue. */
+export type Chain = 'arena' | 'cineplexx' | 'cinestar';
+
+export type CityId = 'novi-sad' | 'beograd';
+
+/**
+ * How to scrape a venue. Arena carries no parameter because its whole site is
+ * one cinema; the other two are addressed by the identifier their own site
+ * uses.
+ */
+export type CinemaSource =
+  | { kind: 'arena' }
+  | { kind: 'cineplexx'; urlName: string }
+  | { kind: 'cinestar'; slug: string };
 
 export interface Cinema {
   id: CinemaId;
+  chain: Chain;
+  city: CityId;
   name: string;
   shortName: string;
   url: string;
+  source: CinemaSource;
+}
+
+export interface City {
+  id: CityId;
+  /** Value of the `grad` query parameter. */
+  slug: string;
+  /** Nominative, for the switcher: "Novi Sad". */
+  name: string;
+  /** Locative, for prose: "u Novom Sadu". Serbian declines, so this is stored. */
+  locative: string;
+  cinemaIds: CinemaId[];
 }
 
 export const CINEMAS: Record<CinemaId, Cinema> = {
-  arena: {
-    id: 'arena',
+  'arena-novi-sad': {
+    id: 'arena-novi-sad',
+    chain: 'arena',
+    city: 'novi-sad',
     name: 'Arena Cineplex Centar',
     shortName: 'Arena Centar',
     url: 'http://www.arenacineplex.com/',
+    source: { kind: 'arena' },
   },
-  cineplexx: {
-    id: 'cineplexx',
+  'cineplexx-novi-sad': {
+    id: 'cineplexx-novi-sad',
+    chain: 'cineplexx',
+    city: 'novi-sad',
     name: 'Cineplexx Promenada',
     shortName: 'Cineplexx Promenada',
     url: 'https://www.cineplexx.rs/cinemas/CINEPLEXX-NOVI-SAD',
+    source: { kind: 'cineplexx', urlName: 'CINEPLEXX-NOVI-SAD' },
   },
-  cinestar: {
-    id: 'cinestar',
+  'cinestar-novi-sad': {
+    id: 'cinestar-novi-sad',
+    chain: 'cinestar',
+    city: 'novi-sad',
     name: 'CineStar BIG',
     shortName: 'CineStar BIG',
     url: 'https://cinestarcinemas.rs/novi-sad-big',
+    source: { kind: 'cinestar', slug: 'novi-sad-big' },
+  },
+  'cineplexx-delta-city': {
+    id: 'cineplexx-delta-city',
+    chain: 'cineplexx',
+    city: 'beograd',
+    name: 'Cineplexx Delta City',
+    shortName: 'Cineplexx Delta City',
+    url: 'https://www.cineplexx.rs/cinemas/CINEPLEXX-4D-DELTA-CITY',
+    source: { kind: 'cineplexx', urlName: 'CINEPLEXX-4D-DELTA-CITY' },
+  },
+  'cineplexx-usce': {
+    id: 'cineplexx-usce',
+    chain: 'cineplexx',
+    city: 'beograd',
+    name: 'Cineplexx Ušće',
+    shortName: 'Cineplexx Ušće',
+    url: 'https://www.cineplexx.rs/cinemas/CINEPLEXX-USCE-SHOPPING-CENTER',
+    source: { kind: 'cineplexx', urlName: 'CINEPLEXX-USCE-SHOPPING-CENTER' },
+  },
+  'cineplexx-big-beograd': {
+    id: 'cineplexx-big-beograd',
+    chain: 'cineplexx',
+    city: 'beograd',
+    name: 'Cineplexx BIG Beograd',
+    shortName: 'Cineplexx BIG',
+    url: 'https://www.cineplexx.rs/cinemas/CINEPLEXX-BIG-BEOGRAD',
+    source: { kind: 'cineplexx', urlName: 'CINEPLEXX-BIG-BEOGRAD' },
+  },
+  'cineplexx-beo': {
+    id: 'cineplexx-beo',
+    chain: 'cineplexx',
+    city: 'beograd',
+    name: 'Cineplexx BEO Shopping Center',
+    shortName: 'Cineplexx BEO',
+    url: 'https://www.cineplexx.rs/cinemas/CINEPLEXX-BEO-SHOPPING-CENTER',
+    source: { kind: 'cineplexx', urlName: 'CINEPLEXX-BEO-SHOPPING-CENTER' },
+  },
+  'cineplexx-galerija': {
+    id: 'cineplexx-galerija',
+    chain: 'cineplexx',
+    city: 'beograd',
+    name: 'Cineplexx Galerija',
+    shortName: 'Cineplexx Galerija',
+    url: 'https://www.cineplexx.rs/cinemas/CINEPLEXX-GALERIJA',
+    source: { kind: 'cineplexx', urlName: 'CINEPLEXX-GALERIJA' },
+  },
+  'cinestar-beograd-ada': {
+    id: 'cinestar-beograd-ada',
+    chain: 'cinestar',
+    city: 'beograd',
+    name: 'CineStar Ada Mall',
+    shortName: 'CineStar Ada Mall',
+    url: 'https://cinestarcinemas.rs/beograd-concept-cinema-ada-mall',
+    source: { kind: 'cinestar', slug: 'beograd-concept-cinema-ada-mall' },
   },
 };
 
-export const CINEMA_IDS: CinemaId[] = ['arena', 'cineplexx', 'cinestar'];
+export const CITIES: City[] = [
+  {
+    id: 'novi-sad',
+    slug: 'novi-sad',
+    name: 'Novi Sad',
+    locative: 'u Novom Sadu',
+    cinemaIds: ['arena-novi-sad', 'cineplexx-novi-sad', 'cinestar-novi-sad'],
+  },
+  {
+    id: 'beograd',
+    slug: 'beograd',
+    name: 'Beograd',
+    locative: 'u Beogradu',
+    cinemaIds: [
+      'cineplexx-delta-city',
+      'cineplexx-usce',
+      'cineplexx-galerija',
+      'cineplexx-big-beograd',
+      'cineplexx-beo',
+      'cinestar-beograd-ada',
+    ],
+  },
+];
+
+/** The city shown before the reader chooses, and to no-JS readers. */
+export const DEFAULT_CITY: CityId = 'novi-sad';
+
+export const CINEMA_IDS: CinemaId[] = CITIES.flatMap((city) => city.cinemaIds);
+
+export function cityById(id: CityId): City {
+  const city = CITIES.find((candidate) => candidate.id === id);
+  if (!city) throw new Error(`Nepoznat grad: ${id}`);
+  return city;
+}
 
 /**
  * `original` is a domestic film playing in Serbian: neither dubbed nor
@@ -132,6 +273,8 @@ export interface Snapshot {
   movies: Movie[];
   sources: Record<CinemaId, SourceStatus>;
   diagnostics: Diagnostics;
+  /** Included so `data.json` is self-describing: which venues sit in which city. */
+  cities: City[];
 }
 
 export interface AdapterResult {

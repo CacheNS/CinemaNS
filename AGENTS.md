@@ -11,14 +11,15 @@ For the condensed version, see
 ## What this is
 
 A static site, rebuilt hourly by GitHub Actions and served by GitHub Pages, that
-scrapes and merges movie showtimes from three Novi Sad cinemas — Arena Centar,
-Cineplexx Promenada and CineStar BIG — enriches them via TMDb, and renders one
-Serbian-language page per day plus a reusable `data.json`.
+scrapes and merges movie showtimes from **nine cinema venues across Novi Sad and
+Beograd**, enriches them via TMDb, and renders one Serbian-language page per day
+plus a reusable `data.json`. The app is called **Kokice**; the repository keeps
+its old name deliberately (R-13.8).
 
 ## Commands
 
 ```
-npm test          # 91 tests, fixtures only, no network
+npm test          # 102 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -35,6 +36,13 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   no API key (it currently runs without one).
 - Dubbing is a property of the **showtime**, not the film, so the dubbed filter
   hides individual chips before emptying cards.
+- `CinemaId` identifies a **venue**, not a chain — Beograd has five Cineplexx
+  venues, and collapsing them would merge Delta City with Galerija. Chain-level
+  facts (metadata trust) live on `Cinema.chain`.
+- City is a property of the **cinema block**, so switching city reuses the same
+  `apply()` loop as the filters.
+- Every city but the default renders pre-hidden and JS only ever *reveals*. A
+  no-JS reader must get a correct single-city page, never a mix.
 - All dates are Europe/Belgrade.
 - Never present a guessed age rating as fact.
 
@@ -49,7 +57,7 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
 - `DS` in an Arena title is not a dubbing marker.
 - CineStar's `.age` field holds genre, not an age rating.
 - Domestic Serbian films are `audio: 'original'` ("domaći film"), remapped at
-  merge level so all three cinemas agree.
+  merge level so all cinemas agree.
 - The page is Serbian **Latin**, never Cyrillic (R-8.12). TMDb's `sr-RS` text is
   Cyrillic; it is converted at the TMDb boundary and again in `escapeHtml`. Use
   `toSerbianLatin()` for display — `transliterate()` folds diacritics and is for
@@ -63,6 +71,11 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   Measured across 33 films, TMDb held **zero** `sr` trailers, so posters legitimately
   open Croatian ones. Check the build's `Trejleri:` line before "fixing" the
   ranking (R-8.10).
+- Cineplexx venue numbers are resolved from `/api/v1/cinemas` by `cinemaUrlName`
+  at scrape time. Never hardcode them: the live ids are non-contiguous (`1114`
+  and `1117` do not exist), so an assumed id silently scrapes the wrong cinema.
+- Arena exists only in Novi Sad — its site has no location selector at all. Do
+  not try to parameterize it by city.
 
 ## Analytics (§16)
 

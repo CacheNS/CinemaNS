@@ -2,7 +2,7 @@ import { formatDayLabel, formatDayShort, formatTimestamp } from '../core/dates.j
 import { analyticsSnippet } from './analytics.js';
 import { trailerLink } from '../core/trailer.js';
 import { toSerbianLatin } from '../core/titles.js';
-import { CINEMAS, CINEMA_IDS } from '../core/types.js';
+import { CINEMAS, CITIES, DEFAULT_CITY, cityById } from '../core/types.js';
 import type { Movie, Showtime, Snapshot } from '../core/types.js';
 
 /**
@@ -73,10 +73,18 @@ function renderShowtime(showtime: Showtime): string {
         </a>`;
 }
 
-function renderCinemaBlock(cinemaId: Movie['showtimes'][number]['cinemaId'], showtimes: Showtime[]): string {
+function renderCinemaBlock(
+  cinemaId: Movie['showtimes'][number]['cinemaId'],
+  showtimes: Showtime[],
+): string {
   const cinema = CINEMAS[cinemaId];
+  // Pre-hidden for every city but the default. Without JS the page would
+  // otherwise show Beograd's showtimes to a Novi Sad reader, which is worse
+  // than showing too few: the dubbed filter degrades to a harmless superset,
+  // but a mixed-city listing is simply wrong.
+  const hidden = cinema.city === DEFAULT_CITY ? '' : ' hidden';
   return `
-      <div class="cinema" data-cinema="${cinemaId}">
+      <div class="cinema" data-cinema="${cinemaId}" data-city="${cinema.city}"${hidden}>
         <a class="cinema__name" href="${escapeHtml(cinema.url)}" rel="noopener" target="_blank">${escapeHtml(
           cinema.shortName,
         )}</a>
@@ -147,10 +155,14 @@ function renderMovie(movie: Movie, date: string): string {
   const showtimes = movie.showtimes.filter((showtime) => showtime.date === date);
   if (showtimes.length === 0) return '';
 
-  const byCinema = CINEMA_IDS.map((cinemaId) => ({
-    cinemaId,
-    showtimes: showtimes.filter((showtime) => showtime.cinemaId === cinemaId),
-  })).filter((entry) => entry.showtimes.length > 0);
+  // Grouped city by city so a card's blocks read Novi Sad first, then Beograd,
+  // rather than interleaving venues from both.
+  const byCinema = CITIES.flatMap((city) => city.cinemaIds)
+    .map((cinemaId) => ({
+      cinemaId,
+      showtimes: showtimes.filter((showtime) => showtime.cinemaId === cinemaId),
+    }))
+    .filter((entry) => entry.showtimes.length > 0);
 
   // Format and audio belong together: the same film runs 2D dubbed in the
   // afternoon and 3D subtitled at night, and that pairing is what people pick by.
@@ -165,6 +177,11 @@ function renderMovie(movie: Movie, date: string): string {
 
   const hasDubbed = showtimes.some((showtime) => showtime.audio === 'dubbed');
   const minAge = movie.ageRating?.minAge ?? -1;
+
+  // Which cities this film actually plays in today, so a card with nothing in
+  // the active city starts hidden rather than empty.
+  const cities = [...new Set(byCinema.map((entry) => CINEMAS[entry.cinemaId].city))];
+  const hidden = cities.includes(DEFAULT_CITY) ? '' : ' hidden';
 
   const trailer = trailerLink(movie);
   const posterImage = movie.posterUrl
@@ -184,8 +201,9 @@ function renderMovie(movie: Movie, date: string): string {
     <article class="movie"
              data-kid-friendly="${movie.kidFriendly ? '1' : '0'}"
              data-min-age="${minAge}"
+             data-cities="${cities.join(' ')}"
              data-has-dubbed="${hasDubbed ? '1' : '0'}"
-             data-rating-confident="${movie.ageRating?.confident ? '1' : '0'}">
+             data-rating-confident="${movie.ageRating?.confident ? '1' : '0'}"${hidden}>
       <div class="movie__poster">${poster}</div>
       <div class="movie__body">
         <h2 class="movie__title">${escapeHtml(movie.title)}${
@@ -229,30 +247,70 @@ function renderDayNav(days: string[], active: string): string {
     .join('\n        ');
 }
 
+/**
+ * One notice block per city, so a reader is only warned about the cinemas they
+ * are actually looking at. All are rendered; JS reveals the active one.
+ */
 function renderSourceNotices(snapshot: Snapshot): string {
-  const problems = CINEMA_IDS.map((id) => ({ id, status: snapshot.sources[id] })).filter(
-    (entry) => !entry.status.ok || entry.status.stale,
-  );
-  if (problems.length === 0) return '';
+  return CITIES.map((city) => {
+    const problems = city.cinemaIds
+      .map((id) => ({ id, status: snapshot.sources[id] }))
+      .filter((entry) => entry.status && (!entry.status.ok || entry.status.stale));
+    if (problems.length === 0) return '';
 
-  const items = problems
-    .map((entry) => {
-      const cinema = CINEMAS[entry.id];
-      const when = formatTimestamp(entry.status.fetchedAt);
-      const reason = entry.status.ok
-        ? `podaci su preuzeti iz ranijeg osvežavanja (${when})`
-        : `poslednje uspešno osvežavanje: ${when}`;
-      return `<li><strong>${escapeHtml(cinema.name)}</strong> — ${escapeHtml(reason)}</li>`;
-    })
-    .join('\n          ');
+    const items = problems
+      .map((entry) => {
+        const cinema = CINEMAS[entry.id];
+        const when = formatTimestamp(entry.status.fetchedAt);
+        const reason = entry.status.ok
+          ? `podaci su preuzeti iz ranijeg osvežavanja (${when})`
+          : `poslednje uspešno osvežavanje: ${when}`;
+        return `<li><strong>${escapeHtml(cinema.name)}</strong> — ${escapeHtml(reason)}</li>`;
+      })
+      .join('\n          ');
 
-  return `
-      <div class="notice notice--stale">
+    const hidden = city.id === DEFAULT_CITY ? '' : ' hidden';
+    return `
+      <div class="notice notice--stale" data-city="${city.id}"${hidden}>
         <p>Podaci za neke bioskope možda nisu ažurni:</p>
         <ul>
           ${items}
         </ul>
       </div>`;
+  }).join('');
+}
+
+/**
+ * Real links, so a chosen city is shareable and survives a reload. JS
+ * intercepts them to switch without a round trip; the `noscript` note is there
+ * because a static page genuinely cannot honour them on its own.
+ */
+function renderCityNav(): string {
+  const tabs = CITIES.map((city) => {
+    const current = city.id === DEFAULT_CITY;
+    return `<a class="citytab${current ? ' citytab--active' : ''}" href="?grad=${
+      city.slug
+    }" data-city="${city.id}"${current ? ' aria-current="page"' : ''}>${escapeHtml(
+      city.name,
+    )}</a>`;
+  }).join('\n      ');
+
+  return `
+    <nav class="cities" id="cities" aria-label="Izbor grada">
+      ${tabs}
+    </nav>
+    <noscript><p class="subtitle">Za promenu grada potreban je JavaScript; prikazan je ${escapeHtml(
+      cityById(DEFAULT_CITY).name,
+    )}.</p></noscript>`;
+}
+
+/** One venue list per city, since the cinemas differ between them. */
+function renderCitySubtitles(): string {
+  return CITIES.map((city) => {
+    const names = city.cinemaIds.map((id) => CINEMAS[id].shortName).join(' · ');
+    const hidden = city.id === DEFAULT_CITY ? '' : ' hidden';
+    return `<p class="subtitle" data-city="${city.id}"${hidden}>${escapeHtml(names)}</p>`;
+  }).join('\n    ');
 }
 
 export function renderDayPage(snapshot: Snapshot, date: string): string {
@@ -260,27 +318,32 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
   const moviesForDay = snapshot.movies.filter((movie) =>
     movie.showtimes.some((showtime) => showtime.date === date),
   );
-  const showtimeCount = snapshot.movies
+
+  // Counts describe the city that is actually visible on first paint, not the
+  // whole payload — otherwise a Novi Sad reader is told about Belgrade films.
+  const defaultCinemas = new Set<string>(cityById(DEFAULT_CITY).cinemaIds);
+  const showtimesToday = snapshot.movies
     .flatMap((movie) => movie.showtimes)
-    .filter((showtime) => showtime.date === date).length;
-  const unknownAudio = snapshot.movies
-    .flatMap((movie) => movie.showtimes)
-    .filter((showtime) => showtime.date === date && showtime.audio === 'unknown').length;
+    .filter((showtime) => showtime.date === date && defaultCinemas.has(showtime.cinemaId));
+  const showtimeCount = showtimesToday.length;
+  const movieCount = moviesForDay.filter((movie) =>
+    movie.showtimes.some(
+      (showtime) => showtime.date === date && defaultCinemas.has(showtime.cinemaId),
+    ),
+  ).length;
 
   const cards = moviesForDay.map((movie) => renderMovie(movie, date)).join('');
 
-  const emptyState =
-    moviesForDay.length === 0
-      ? `<p class="empty">Za ovaj dan nema pronađenih projekcija.</p>`
-      : '';
+  const emptyHidden = movieCount === 0 ? '' : ' hidden';
+  const emptyState = `<p class="empty" id="empty"${emptyHidden}>Za ovaj dan nema pronađenih projekcija.</p>`;
 
   return `<!DOCTYPE html>
 <html lang="sr-Latn">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bioskopi u Novom Sadu — ${escapeHtml(formatDayLabel(date, days[0]))}</title>
-  <meta name="description" content="Objedinjen repertoar bioskopa u Novom Sadu: Arena Cineplex Centar, Cineplexx Promenada i CineStar BIG.">
+  <title>Kokice.org — ${escapeHtml(formatDayLabel(date, days[0]))}</title>
+  <meta name="description" content="Kokice — objedinjen repertoar bioskopa u Novom Sadu i Beogradu, osvežen svakog sata.">
   <link rel="stylesheet" href="assets/style.css">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0f1115">
@@ -288,12 +351,13 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
   <link rel="apple-touch-icon" href="assets/icon-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Bioskopi NS">
+  <meta name="apple-mobile-web-app-title" content="Kokice">
 </head>
 <body>
   <header class="header">
-    <h1>Bioskopi u Novom Sadu</h1>
-    <p class="subtitle">Arena Cineplex Centar · Cineplexx Promenada · CineStar BIG</p>
+    <h1>Kokice.org — Repertoar bioskopa</h1>
+    ${renderCitySubtitles()}
+    ${renderCityNav()}
   </header>
 
   <nav class="days" aria-label="Izbor dana">
@@ -315,8 +379,8 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
       </form>
     </div>
 
-    <p class="counts" id="counts" data-total-movies="${moviesForDay.length}" data-total-showtimes="${showtimeCount}" data-unknown-audio="${unknownAudio}">
-      ${moviesForDay.length} filmova · ${showtimeCount} projekcija
+    <p class="counts" id="counts" data-total-movies="${movieCount}" data-total-showtimes="${showtimeCount}">
+      ${movieCount} filmova · ${showtimeCount} projekcija
     </p>
 
     ${renderSourceNotices(snapshot)}
@@ -346,7 +410,6 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
     <p>Podaci se preuzimaju sa sajtova bioskopa. Uzrasne oznake i ocene su
        informativne i preuzete iz TMDb baze — proverite zvaničnu oznaku na sajtu
        bioskopa.</p>
-    <p><a href="data.json">Svi podaci u JSON formatu</a></p>
     ${
       process.env['CF_BEACON_TOKEN']?.trim()
         ? `<p class="footer__privacy">Broj poseta se meri anonimno (Cloudflare Web

@@ -2,7 +2,17 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { escapeHtml, renderDayPage, renderPages, runtimeBucket } from './html.js';
-import type { Snapshot } from '../core/types.js';
+import { CINEMA_IDS, CITIES, DEFAULT_CITY } from '../core/types.js';
+import type { CinemaId, Snapshot, SourceStatus } from '../core/types.js';
+
+// Every venue needs a status; the three the fixture cares about are overridden
+// below, the rest just have to exist.
+const ok3 = Object.fromEntries(
+  CINEMA_IDS.map((id) => [
+    id,
+    { ok: true, fetchedAt: '2026-08-19T10:00:00.000Z', movieCount: 0, showtimeCount: 0, stale: false },
+  ]),
+) as Record<CinemaId, SourceStatus>;
 
 const snapshot: Snapshot = {
   generatedAt: '2026-08-19T10:00:00.000Z',
@@ -21,7 +31,7 @@ const snapshot: Snapshot = {
       aliases: ['Vajana', 'VAJANA (sinhronizovano)'],
       showtimes: [
         {
-          cinemaId: 'cinestar',
+          cinemaId: 'cinestar-novi-sad',
           date: '2026-08-19',
           time: '14:00',
           format: '2D',
@@ -29,12 +39,38 @@ const snapshot: Snapshot = {
           bookingUrl: 'https://example.test/a',
         },
         {
-          cinemaId: 'arena',
+          cinemaId: 'arena-novi-sad',
           date: '2026-08-19',
           time: '20:00',
           format: '3D',
           audio: 'subtitled',
           bookingUrl: 'https://example.test/b',
+        },
+        {
+          cinemaId: 'cineplexx-galerija',
+          date: '2026-08-19',
+          time: '18:00',
+          format: '2D',
+          audio: 'dubbed',
+          bookingUrl: 'https://example.test/bg',
+        },
+      ],
+    },
+    {
+      key: 'tmdb:3',
+      title: 'Samo u Beogradu',
+      genres: ['Drama'],
+      kidFriendly: false,
+      hasDubbed: false,
+      aliases: [],
+      showtimes: [
+        {
+          cinemaId: 'cinestar-beograd-ada',
+          date: '2026-08-19',
+          time: '21:00',
+          format: '2D',
+          audio: 'subtitled',
+          bookingUrl: 'https://example.test/d',
         },
       ],
     },
@@ -47,7 +83,7 @@ const snapshot: Snapshot = {
       aliases: [],
       showtimes: [
         {
-          cinemaId: 'cineplexx',
+          cinemaId: 'cineplexx-novi-sad',
           date: '2026-08-20',
           time: '22:00',
           format: '2D',
@@ -58,9 +94,10 @@ const snapshot: Snapshot = {
     },
   ],
   sources: {
-    arena: { ok: true, fetchedAt: '2026-08-19T10:00:00.000Z', movieCount: 1, showtimeCount: 1, stale: false },
-    cineplexx: { ok: true, fetchedAt: '2026-08-19T10:00:00.000Z', movieCount: 1, showtimeCount: 1, stale: false },
-    cinestar: {
+    ...ok3,
+    'arena-novi-sad': { ok: true, fetchedAt: '2026-08-19T10:00:00.000Z', movieCount: 1, showtimeCount: 1, stale: false },
+    'cineplexx-novi-sad': { ok: true, fetchedAt: '2026-08-19T10:00:00.000Z', movieCount: 1, showtimeCount: 1, stale: false },
+    'cinestar-novi-sad': {
       ok: true,
       fetchedAt: '2026-08-19T08:00:00.000Z',
       movieCount: 1,
@@ -69,11 +106,58 @@ const snapshot: Snapshot = {
       error: 'timeout',
     },
   },
+  cities: CITIES,
   diagnostics: { tmdbResolved: 2, tmdbUnresolved: 0, unresolvedTitles: [], unknownAudioShowtimes: 0 },
 };
 
 test('escapes user-visible strings', () => {
   assert.equal(escapeHtml('<b>"x"</b>'), '&lt;b&gt;&quot;x&quot;&lt;/b&gt;');
+});
+
+test('offers every city, with the default one selected', () => {
+  const today = renderDayPage(snapshot, '2026-08-19');
+  for (const city of CITIES) {
+    assert.ok(today.includes(`data-city="${city.id}"`), `missing ${city.id}`);
+    assert.ok(today.includes(`?grad=${city.slug}`), `missing link for ${city.slug}`);
+  }
+  assert.ok(today.includes('citytab citytab--active'));
+});
+
+// Without JS the page must be a correct single-city page: a superset is fine
+// for the dubbed filter but plainly wrong for city.
+test('only the default city is visible before JS runs', () => {
+  const today = renderDayPage(snapshot, '2026-08-19');
+  const blocks = today.match(/<div class="cinema"[^>]*>/g) ?? [];
+  assert.ok(blocks.length >= 4, `expected blocks from both cities, got ${blocks.length}`);
+
+  for (const block of blocks) {
+    const isDefault = block.includes(`data-city="${DEFAULT_CITY}"`);
+    assert.equal(
+      block.includes('hidden'),
+      !isDefault,
+      `wrong initial visibility: ${block}`,
+    );
+  }
+});
+
+test('a film playing only in another city starts hidden', () => {
+  const today = renderDayPage(snapshot, '2026-08-19');
+  const card = today.slice(0, today.indexOf('Samo u Beogradu'));
+  const openTag = card.slice(card.lastIndexOf('<article'));
+  assert.ok(openTag.includes('data-cities="beograd"'));
+  assert.ok(openTag.includes('hidden'));
+});
+
+test('counts describe the visible city, not the whole payload', () => {
+  const today = renderDayPage(snapshot, '2026-08-19');
+  // Novi Sad has one film with two showtimes; Beograd's are excluded.
+  assert.ok(today.includes('data-total-movies="1"'), today.match(/data-total-movies="\d+"/)?.[0]);
+  assert.ok(today.includes('data-total-showtimes="2"'));
+});
+
+test('stale-source warnings are scoped to their city', () => {
+  const today = renderDayPage(snapshot, '2026-08-19');
+  assert.ok(today.includes(`<div class="notice notice--stale" data-city="${DEFAULT_CITY}">`));
 });
 
 test('renders one page per day, with today as index.html', () => {

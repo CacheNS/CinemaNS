@@ -43,6 +43,30 @@ a { color: inherit; }
   font-size: 0.9rem;
 }
 
+.cities {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.citytab {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* Modifier after the base rule, or the base `color` wins. */
+.citytab--active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
 .days {
   display: flex;
   gap: 0.4rem;
@@ -392,6 +416,7 @@ main {
 .install__hint strong { color: var(--text); }
 
 @media (max-width: 520px) {
+  .header h1 { font-size: 1.25rem; }
   .movie { gap: 0.7rem; padding: 0.7rem; }
   .movie__poster { flex-basis: 68px; }
   .poster { width: 68px; height: 102px; }

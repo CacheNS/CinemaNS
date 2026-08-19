@@ -89,6 +89,12 @@ class Canvas {
     }
   }
 
+  /** A circle, expressed as the degenerate rounded rect where radius == w/2. */
+  circle(cx: number, cy: number, diameter: number, color: Rgba): void {
+    const radius = diameter / 2;
+    this.roundRect(cx - radius, cy - radius, diameter, diameter, radius, color);
+  }
+
   toPng(): Buffer {
     const stride = this.size * 4;
     const rawData = Buffer.alloc((stride + 1) * this.size);
@@ -120,10 +126,15 @@ class Canvas {
 
 const BACKGROUND: Rgba = { r: 15, g: 17, b: 21, a: 255 };
 const ACCENT: Rgba = { r: 255, g: 201, b: 77, a: 255 };
+const POPCORN: Rgba = { r: 255, g: 246, b: 224, a: 255 };
 
 /**
- * A film strip on the app's dark background. `fullBleed` squares off the
- * background for maskable and iOS icons, which are masked by the platform.
+ * A tub of popcorn on the app's dark background — the app is called Kokice.
+ * `fullBleed` squares off the background for maskable and iOS icons, which are
+ * masked by the platform.
+ *
+ * The kernels are drawn before the tub so the tub's front edge overlaps them,
+ * which is what reads as popcorn sitting *in* the tub rather than behind it.
  */
 export function renderIcon(size: number, fullBleed = false): Buffer {
   const canvas = new Canvas(size);
@@ -131,31 +142,47 @@ export function renderIcon(size: number, fullBleed = false): Buffer {
 
   // Maskable icons must keep their art inside the central safe zone.
   const scale = fullBleed ? 0.62 : 0.78;
-  const stripW = size * 0.46 * scale;
-  const stripH = size * 0.86 * scale;
-  const x = (size - stripW) / 2;
-  const y = (size - stripH) / 2;
+  const art = size * scale;
+  const left = (size - art) / 2;
+  const top = (size - art) / 2;
+  const midX = size / 2;
 
-  canvas.roundRect(x, y, stripW, stripH, stripW * 0.14, ACCENT);
+  // Kernels: one large centre puff with smaller ones tucked around it, so the
+  // silhouette stays lumpy rather than reading as a row of equal circles.
+  const kernels: [number, number, number][] = [
+    [midX, top + art * 0.3, art * 0.32],
+    [midX - art * 0.23, top + art * 0.37, art * 0.27],
+    [midX + art * 0.23, top + art * 0.37, art * 0.27],
+    [midX - art * 0.11, top + art * 0.15, art * 0.22],
+    [midX + art * 0.13, top + art * 0.17, art * 0.2],
+  ];
+  for (const [cx, cy, diameter] of kernels) {
+    canvas.circle(cx, cy, diameter, POPCORN);
+  }
 
-  const holeSize = stripW * 0.16;
-  const inset = stripW * 0.09;
-  const rows = 4;
-  const gap = (stripH - rows * holeSize) / (rows + 1);
-  for (let row = 0; row < rows; row++) {
-    const hy = y + gap + row * (holeSize + gap);
-    canvas.roundRect(x + inset, hy, holeSize, holeSize, holeSize * 0.3, BACKGROUND);
-    canvas.roundRect(x + stripW - inset - holeSize, hy, holeSize, holeSize, holeSize * 0.3, BACKGROUND);
+  const tubW = art * 0.68;
+  const tubH = art * 0.48;
+  const tubX = midX - tubW / 2;
+  const tubY = top + art * 0.5;
+  canvas.roundRect(tubX, tubY, tubW, tubH, tubW * 0.08, ACCENT);
+
+  // Vertical stripes, the one detail that makes a plain rectangle read as a
+  // cinema popcorn tub.
+  const stripes = 4;
+  const stripeW = tubW / (stripes * 2 + 1);
+  for (let i = 0; i < stripes; i++) {
+    const sx = tubX + stripeW * (i * 2 + 1);
+    canvas.roundRect(sx, tubY, stripeW, tubH, 0, BACKGROUND);
   }
 
   return canvas.toPng();
 }
 
 export const MANIFEST = {
-  name: 'Bioskopi u Novom Sadu',
-  short_name: 'Bioskopi NS',
+  name: 'Kokice',
+  short_name: 'Kokice',
   description:
-    'Objedinjen repertoar bioskopa u Novom Sadu: Arena Cineplex Centar, Cineplexx Promenada i CineStar BIG.',
+    'Kokice — objedinjen repertoar bioskopa u Novom Sadu i Beogradu, osvežen svakog sata.',
   lang: 'sr-Latn-RS',
   dir: 'ltr',
   start_url: './index.html',

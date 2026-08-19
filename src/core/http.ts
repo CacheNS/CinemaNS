@@ -5,7 +5,7 @@ import { ImpersonateUnavailableError, fetchTextImpersonated } from './impersonat
 const DEFAULT_TIMEOUT_MS = Number(process.env['REQUEST_TIMEOUT_MS'] ?? 20_000);
 const USER_AGENT =
   process.env['USER_AGENT'] ??
-  'CinemaNS/1.0 (+https://github.com/CacheNS/CinemaNS) hourly repertoire aggregator';
+  'Kokice/1.0 (+https://github.com/CacheNS/CinemaNS) hourly repertoire aggregator';
 
 /** Minimum gap between requests to the same host, so we stay a polite guest. */
 const HOST_DELAY_MS = 300;

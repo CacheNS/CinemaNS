@@ -1,4 +1,4 @@
-# Requirements — Novi Sad Cinema Aggregator
+# Requirements — Kokice
 
 The baseline specification for this project. Every requirement below is
 currently implemented unless explicitly marked **OPEN**. Treat this as the
@@ -11,19 +11,41 @@ Each requirement has a stable id (`R-*`) so changes can reference it.
 
 ## 1. Purpose and scope
 
-**R-1.1** One page that shows what is playing in Novi Sad cinemas, merged
-across all cinemas and grouped by movie.
+**R-1.1** One page that shows what is playing in a chosen city's cinemas, merged
+across all of that city's cinemas and grouped by movie.
 
-**R-1.2** Covers exactly three cinemas:
+**R-1.2** Covers exactly nine venues across two cities. Venue coverage was
+verified against the live sites and APIs; it is not a guess.
 
-| Cinema | Display name | Source |
+**Novi Sad**
+
+| Venue id | Display name | Source |
 |---|---|---|
-| Arena Cineplex | **Arena Centar** | `arenacineplex.com` (server-rendered HTML) |
-| Cineplexx | **Cineplexx Promenada** | `app.cineplexx.rs/api/v1` (JSON API) |
-| CineStar | **CineStar BIG** | `cinestarcinemas.rs/novi-sad-big` (server-rendered HTML) |
+| `arena-novi-sad` | **Arena Centar** | `arenacineplex.com` (server-rendered HTML) |
+| `cineplexx-novi-sad` | **Cineplexx Promenada** | `app.cineplexx.rs/api/v1` (JSON API) |
+| `cinestar-novi-sad` | **CineStar BIG** | `cinestarcinemas.rs/novi-sad-big` (HTML) |
+
+**Beograd**
+
+| Venue id | Display name | Source |
+|---|---|---|
+| `cineplexx-delta-city` | **Cineplexx Delta City** | Cineplexx API |
+| `cineplexx-usce` | **Cineplexx Ušće** | Cineplexx API |
+| `cineplexx-big-beograd` | **Cineplexx BIG** | Cineplexx API |
+| `cineplexx-beo` | **Cineplexx BEO** | Cineplexx API |
+| `cineplexx-galerija` | **Cineplexx Galerija** | Cineplexx API |
+| `cinestar-beograd-ada` | **CineStar Ada Mall** | `cinestarcinemas.rs/beograd-concept-cinema-ada-mall` |
+
+**R-1.2.1** Arena Cineplex exists **only in Novi Sad** — `arenacineplex.com` has
+no location selector at all, the whole site is one cinema. The cinema set is
+genuinely per-city, not a chain list filtered by city.
+
+**R-1.2.2** Niš and Subotica have none of these three chains and cannot be added
+without an entirely new adapter.
 
 **R-1.3** The cinema's location must always be part of its displayed name
-(BIG / Centar / Promenada). Never show a bare brand name.
+(BIG / Centar / Promenada / Ada Mall / Delta City). Never show a bare brand
+name — with five Cineplexx venues in Beograd, "Cineplexx" alone is meaningless.
 
 **R-1.4** Covers today plus the next 7 days (8 days total).
 
@@ -72,14 +94,14 @@ body** from a GitHub Actions runner. Measured on the runner (`52.234.41.68`):
 Headers cannot fix this, and neither can a real headless browser. CineStar is
 therefore fetched with `tlsFallback: true`: an ordinary Node fetch first, and on
 403 only, a retry through `curl_cffi`, which replays a Chrome handshake. Arena
-and Cineplexx keep the honest `CinemaNS` User-Agent. Do not enable `tlsFallback`
+and Cineplexx keep the honest `Kokice` User-Agent. Do not enable `tlsFallback`
 elsewhere without the same evidence.
 
 **R-2.7a-i The fallback is optional, never required.** It shells out to Python +
 `curl_cffi`, installed by a `continue-on-error` CI step. When absent,
 `fetchText` re-throws the original 403, so the failure reads as "CineStar
 refused us" rather than "Python is missing", and the build degrades to
-CineStar's last good data (R-11.2). `CINEMANS_DISABLE_IMPERSONATE=1` forces it
+CineStar's last good data (R-11.2). `KOKICE_DISABLE_IMPERSONATE=1` forces it
 off, which is how the tests stay offline.
 
 **R-2.7b A 403 is retryable.** Unlike other 4xx codes, a 403 from bot
@@ -137,14 +159,35 @@ subtitled.
 `kidFriendly`, `hasDubbed`, `aliases` (every raw title seen anywhere, for
 debugging) and showtimes grouped by date.
 
-**R-4.4** `Snapshot` carries `generatedAt`, the 8 `days`, `movies`, and a
-per-cinema `sources` record with `ok` / `fetchedAt` / `error`.
+**R-4.4** `Snapshot` carries `generatedAt`, the 8 `days`, `movies`, a
+per-venue `sources` record with `ok` / `fetchedAt` / `error`, and the `cities`
+registry so `data.json` is self-describing about which venue sits where.
 
 **R-4.5** `data.json` is a public, reusable artifact — it must stay a complete
-representation of the snapshot, not a UI-shaped subset.
+representation of the snapshot, not a UI-shaped subset. It is still published at
+`dist/data.json`, but is **not linked from the page footer**: it is a developer
+artifact, and the footer is read by cinema-goers.
 
 **R-4.6** All date/time parsing is pinned to **Europe/Belgrade** to avoid
 off-by-one days.
+
+**R-4.7** `CinemaId` identifies a **venue**, not a chain. Beograd has five
+Cineplexx venues; if `cinemaId` meant the chain they would all merge into one
+block and show Delta City and Galerija showtimes as though they were the same
+building. Chain-level facts live on `Cinema.chain`.
+
+**R-4.8** Metadata trust order is a property of the **chain**
+(`cineplexx → cinestar → arena`, R-10.5), so `METADATA_TRUST` keys on `Chain`.
+All five Beograd Cineplexx venues must be trusted identically.
+
+**R-4.9** Every venue belongs to exactly one city, and each city's `cinemaIds`
+lists only its own venues. The registry is hand-written in two places, so this
+is asserted by test rather than assumed.
+
+**R-4.10** Cineplexx venue numbers are resolved at scrape time from
+`/api/v1/cinemas` by `cinemaUrlName`, never hardcoded — the live ids are
+non-contiguous (`1114` and `1117` do not exist), which is exactly the shape that
+makes guessing dangerous.
 
 ---
 
@@ -230,6 +273,55 @@ unfiltered. Nothing is broken or empty.
 **R-7.8** `audio: 'unknown'` showtimes are excluded by the dubbed filter, but
 the UI reports how many were excluded for that reason — a parsing gap must look
 like a parsing gap, not an empty schedule.
+
+---
+
+## 7b. City switching
+
+**R-7b.1** The reader picks a city; the whole page is scoped to it. Novi Sad is
+the default.
+
+**R-7b.2** One page carries **both cities**, switched client-side with no
+reload. Measured, not assumed: a day page is ~50–81 KB raw but compresses
+**11–14×**, and GitHub Pages does serve gzip (verified with
+`curl -H "Accept-Encoding: gzip"` — `Content-Encoding: gzip`,
+`Content-Length: 7020`). Both cities together are ~18 KB over the wire, less
+than one poster image.
+
+**R-7b.3 City is a property of the cinema block**, so the switch is one extra
+condition inside the existing `apply()` loop rather than a second mechanism.
+Card-hiding then falls out for free, exactly as it does for the dubbed filter
+(R-7.3).
+
+**R-7b.4 The non-default city is rendered with `hidden` already set, and JS
+only ever reveals.** This differs deliberately from R-7.7: with no JS a broader
+result is harmless for the dubbed and kids filters, but a Novi Sad reader seeing
+Belgrade showtimes mixed in is simply *wrong*. Pre-hiding makes the no-JS page a
+correct single-city page.
+
+**R-7b.5** Counts, the empty-state message, the venue subtitle and the
+stale-source notices are all **per city**. A Novi Sad reader must never be
+warned about a Belgrade outage.
+
+**R-7b.6** City lives in the URL as `?grad=<slug>` and is remembered in
+`localStorage`. An explicit URL param **wins over** the stored preference, so a
+shared link always shows the recipient what the sender saw. The param rides the
+same `syncUrl` path as the filters and propagates across day tabs.
+
+**R-7b.7** The city tabs are real `<a href="?grad=…">` links — shareable and
+crawlable — intercepted by JS. Because a static page cannot honour them without
+JS, a `<noscript>` note says so rather than leaving a dead control.
+
+**R-7b.8 Merging is global, not per city.** A film playing in both cities is one
+`Movie` carrying showtimes from both; the split happens at render. This roughly
+halves TMDb lookups, which matters because TMDb is rate-limited and the build
+runs hourly.
+
+**R-7b.9 Accepted trade-off:** a single combined page cannot have a
+city-specific `<title>`/`<h1>`, so it will not rank for "bioskopi u beogradu".
+This is the known price of instant switching. If search traffic later outweighs
+switch latency, the fix is to *additionally* emit per-city entry pages that
+deep-link into the combined page — not to abandon the combined page.
 
 ---
 
@@ -450,7 +542,13 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **91 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **102 tests passing**, `tsc --noEmit` clean.
+
+**R-12.5** The city model is covered by tests that would fail if the registry
+drifted: every venue belongs to exactly one city (R-4.9), venues of the same
+chain stay distinct after merging (R-4.7), a film in two cities merges into one
+entry (R-7b.8), and the rendered page has the non-default city pre-hidden
+(R-7b.4) with counts scoped to the visible city (R-7b.5).
 
 ---
 
@@ -489,6 +587,22 @@ disables `schedule` workflows in forked repositories, which would silently kill
 the hourly refresh (R-2.1). To move the project between accounts, use
 *Settings → Transfer ownership*, which keeps history and redirects the old URL.
 
+**R-13.8 The app is named "Kokice"; the repository is deliberately NOT
+renamed.** `CacheNS/CinemaNS` drives the live URL `cachens.github.io/CinemaNS/`.
+Renaming the repository would break every existing bookmark and shared link,
+orphan installed PWA copies (the service-worker scope and `start_url` are
+origin-relative, so installs are abandoned rather than updated), and reset the
+Cloudflare Analytics hostname and its visit history. All of that cost buys
+nothing while `kokice.org` is not owned — the URL still would not be the real
+one. **The repository rename belongs with the domain move, as a single
+cutover.** Internal identifiers (`kokice`, `KOKICE_DISABLE_IMPERSONATE`) are
+renamed because they are invisible to users and cost nothing.
+
+**R-13.9** Renaming the app requires bumping the service-worker cache key
+(`kokice-v2`). `sw.js` caches `index.html`, so without a bump installed users
+keep seeing the old name; the `activate` handler already evicts any key that is
+not current.
+
 ---
 
 ## 14. Open items
@@ -504,8 +618,9 @@ heuristic was found.
 
 **R-14.3 DONE — published.** Live at <https://cachens.github.io/CinemaNS/>,
 built and deployed by GitHub Actions from `main`. Pages source is set to
-GitHub Actions, all three scrapers report `ok`, and the hourly workflow's
-data-refresh commit is confirmed working.
+GitHub Actions, all nine scrapers report `ok`, and the hourly workflow's
+data-refresh commit is confirmed working. The URL keeps the old repository name
+by design — see R-13.8.
 
 **R-14.4 DONE — analytics enabled.** `CF_BEACON_TOKEN` is set as a repository
 variable and the beacon is confirmed present in the deployed HTML. See §16.
@@ -537,6 +652,15 @@ the UI must keep stating the source country and marking guesses.
 
 **R-15.6** Analytics must stay cookieless (R-16.2). Anything that stores an id
 on the device drags in a consent banner and defeats R-2.1.
+
+**R-15.7** Adding a city means adding venues to the registry, never adding a
+`if (city === …)` branch to an adapter. An adapter takes its venue's identity as
+a parameter; if a new city cannot be expressed that way, it needs a new adapter
+(R-1.2.2).
+
+**R-15.8** Anything rendered per city must be pre-hidden for every city but the
+default, and JS must only ever reveal (R-7b.4). A new per-city element that
+defaults to visible is a no-JS correctness bug, not a cosmetic one.
 
 ---
 

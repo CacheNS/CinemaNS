@@ -1,4 +1,4 @@
-# Copilot instructions — Novi Sad Cinema Aggregator
+# Copilot instructions — Kokice (Serbian cinema aggregator)
 
 **Read [`REQUIREMENTS.md`](../REQUIREMENTS.md) before making any change to this
 repository.** It is the baseline specification: every requirement in it is
@@ -9,9 +9,10 @@ in commit messages and PR descriptions when a change touches them.
 ## What this is
 
 A static site, rebuilt hourly by GitHub Actions and served by GitHub Pages, that
-scrapes and merges showtimes from three Novi Sad cinemas (Arena Centar,
-Cineplexx Promenada, CineStar BIG), enriches them via TMDb, and renders one
-Serbian-language HTML page per day.
+scrapes and merges showtimes from **nine cinema venues across Novi Sad and
+Beograd** (Arena, Cineplexx, CineStar), enriches them via TMDb, and renders one
+Serbian-language HTML page per day. The app is named **Kokice**; the repository
+keeps its old name on purpose until the domain move (R-13.8).
 
 ## Non-negotiable constraints
 
@@ -23,6 +24,14 @@ Serbian-language HTML page per day.
 - **Dubbing is a property of the showtime, not the film.** The same film runs
   dubbed in the afternoon and subtitled in the evening, so the dubbed filter
   hides individual chips and only then empties cards.
+- **`CinemaId` is a venue, not a chain.** Beograd has five Cineplexx venues;
+  collapsing them would show Delta City and Galerija as one building. Chain-level
+  facts such as metadata trust live on `Cinema.chain`.
+- **City is a property of the cinema block**, so the city switch is one more
+  condition in the existing `apply()` loop, not a second mechanism.
+- **Every city but the default renders pre-hidden; JS only reveals.** Unlike the
+  other filters, a no-JS superset here would be actively wrong — a Novi Sad
+  reader must never see Belgrade showtimes.
 - **All dates are Europe/Belgrade.** Off-by-one days are the classic bug here.
 - **Never present a guessed age rating as fact.** Heuristic ratings are marked
   `confident: false` and shown as such.
@@ -71,7 +80,7 @@ These look like trivia, but each one was a real bug. See §10 of
 
 ## Working in this repo
 
-- `npm test` (91 tests, no network — fixtures only) and `npx tsc --noEmit` must
+- `npm test` (102 tests, no network — fixtures only) and `npx tsc --noEmit` must
   both pass before committing.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.

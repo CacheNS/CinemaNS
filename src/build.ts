@@ -8,7 +8,7 @@ import { scrapeCineplexx } from './adapters/cineplexx.js';
 import { scrapeCinestar } from './adapters/cinestar.js';
 import { windowDays } from './core/dates.js';
 import { mergeMovies } from './core/merge.js';
-import { CINEMAS, CINEMA_IDS } from './core/types.js';
+import { CINEMAS, CINEMA_IDS, CITIES } from './core/types.js';
 import type { CinemaId, Movie, RawMovie, Snapshot, SourceStatus } from './core/types.js';
 import { TmdbClient } from './tmdb/client.js';
 import { renderPages } from './render/html.js';
@@ -28,11 +28,23 @@ interface RawCacheEntry {
 
 type RawCache = Partial<Record<CinemaId, RawCacheEntry>>;
 
-const SCRAPERS: Record<CinemaId, (days: string[]) => Promise<{ movies: RawMovie[] }>> = {
-  arena: scrapeArena,
-  cineplexx: scrapeCineplexx,
-  cinestar: scrapeCinestar,
-};
+const SCRAPERS: Record<CinemaId, (days: string[]) => Promise<{ movies: RawMovie[] }>> =
+  Object.fromEntries(
+    CINEMA_IDS.map((id) => {
+      const { source } = CINEMAS[id];
+      const scrape = (days: string[]): Promise<{ movies: RawMovie[] }> => {
+        switch (source.kind) {
+          case 'arena':
+            return scrapeArena(days);
+          case 'cineplexx':
+            return scrapeCineplexx(days, id, source.urlName);
+          case 'cinestar':
+            return scrapeCinestar(days, id, source.slug);
+        }
+      };
+      return [id, scrape];
+    }),
+  ) as Record<CinemaId, (days: string[]) => Promise<{ movies: RawMovie[] }>>;
 
 async function readJson<T>(file: string, fallback: T): Promise<T> {
   try {
@@ -166,6 +178,7 @@ export async function build(): Promise<Snapshot> {
     movies,
     sources,
     diagnostics,
+    cities: CITIES,
   };
 
   console.log(

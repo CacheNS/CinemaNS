@@ -11,6 +11,7 @@ import {
 import { FIXTURE_DAYS, assertValidShowtimes, fixture } from './testing.js';
 
 const html = fixture('cinestar.html');
+const PAGE_URL = 'https://www.cinestarcinemas.rs/bioskop/novi-sad-big';
 
 test('resolves CineStar day labels without a year', () => {
   assert.equal(resolveDate('DANAS, 19.08.', FIXTURE_DAYS), '2026-08-19');
@@ -38,7 +39,7 @@ test('reads projection format from CineStar codes', () => {
 });
 
 test('parses the saved CineStar page', () => {
-  const movies = parseCinestar(html, FIXTURE_DAYS);
+  const movies = parseCinestar(html, FIXTURE_DAYS, 'cinestar-novi-sad', PAGE_URL);
 
   assert.ok(movies.length >= 15, `expected many films, got ${movies.length}`);
   const showtimes = movies.flatMap((movie) => movie.showtimes);
@@ -46,7 +47,7 @@ test('parses the saved CineStar page', () => {
   assertValidShowtimes(showtimes);
 
   for (const movie of movies) {
-    assert.equal(movie.cinemaId, 'cinestar');
+    assert.equal(movie.cinemaId, 'cinestar-novi-sad');
     assert.ok(movie.rawTitle.length > 0);
     // The genre label must not leak into the title.
     assert.ok(!/žanr/i.test(movie.rawTitle), `genre leaked into title: ${movie.rawTitle}`);
@@ -73,7 +74,7 @@ test('reads the original title from a CineStar film page', () => {
 });
 
 test('film page links are absolute so they can be fetched', () => {
-  const movies = parseCinestar(html, FIXTURE_DAYS);
+  const movies = parseCinestar(html, FIXTURE_DAYS, 'cinestar-novi-sad', PAGE_URL);
   const linked = movies.filter((movie) => movie.detailUrl);
   assert.ok(linked.length > 0);
   for (const movie of linked) {

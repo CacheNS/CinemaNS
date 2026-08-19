@@ -71,7 +71,7 @@ test('other hosts keep the honest, identifiable User-Agent', async () => {
   }
 
   const ua = stub.calls[0]!.headers['User-Agent']!;
-  assert.match(ua, /CinemaNS/);
+  assert.match(ua, /Kokice/);
   assert.doesNotMatch(ua, /Mozilla/);
 });
 
@@ -88,7 +88,7 @@ test('tlsFallback reports the original 403 when the impersonator is unavailable'
   // A missing interpreter must not mask the real diagnosis, which is that the
   // host returned 403. Forced off so the test never depends on what happens to
   // be installed, and never reaches the network.
-  process.env['CINEMANS_DISABLE_IMPERSONATE'] = '1';
+  process.env['KOKICE_DISABLE_IMPERSONATE'] = '1';
   resetInterpreterCache();
   const stub = stubFetch([403]);
   try {

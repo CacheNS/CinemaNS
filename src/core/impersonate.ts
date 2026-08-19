@@ -36,7 +36,7 @@ function tryRun(command: string, args: string[]): Promise<{ ok: boolean; out: Bu
 /** Finds a Python that can import curl_cffi, or null. Probed once per build. */
 async function findInterpreter(): Promise<string | null> {
   if (cachedInterpreter !== undefined) return cachedInterpreter;
-  if (process.env['CINEMANS_DISABLE_IMPERSONATE'] === '1') {
+  if (process.env['KOKICE_DISABLE_IMPERSONATE'] === '1') {
     cachedInterpreter = null;
     return null;
   }

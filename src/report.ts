@@ -1,34 +1,44 @@
 import { build } from './build.js';
-import { CINEMAS, CINEMA_IDS } from './core/types.js';
+import { CINEMAS, CITIES } from './core/types.js';
 import { formatDayLabel } from './core/dates.js';
 
 async function main(): Promise<void> {
   const snapshot = await build();
 
   console.log('\n=== IZVORI ===');
-  for (const id of CINEMA_IDS) {
-    const status = snapshot.sources[id];
-    const flag = status.ok ? (status.stale ? 'STARO' : 'OK') : 'GREŠKA';
-    console.log(
-      `${flag.padEnd(6)} ${CINEMAS[id].name.padEnd(24)} ${String(status.movieCount).padStart(3)} filmova ${String(
-        status.showtimeCount,
-      ).padStart(4)} projekcija${status.error ? ` — ${status.error}` : ''}`,
-    );
+  for (const city of CITIES) {
+    console.log(`-- ${city.name}`);
+    for (const id of city.cinemaIds) {
+      const status = snapshot.sources[id];
+      const flag = status.ok ? (status.stale ? 'STARO' : 'OK') : 'GREŠKA';
+      console.log(
+        `${flag.padEnd(6)} ${CINEMAS[id].name.padEnd(30)} ${String(status.movieCount).padStart(
+          3,
+        )} filmova ${String(status.showtimeCount).padStart(4)} projekcija${
+          status.error ? ` — ${status.error}` : ''
+        }`,
+      );
+    }
   }
 
   console.log('\n=== PO DANIMA ===');
   for (const day of snapshot.days) {
-    const showtimes = snapshot.movies
-      .flatMap((movie) => movie.showtimes)
-      .filter((showtime) => showtime.date === day);
-    const movies = snapshot.movies.filter((movie) =>
-      movie.showtimes.some((showtime) => showtime.date === day),
-    );
-    console.log(
-      `${day} ${formatDayLabel(day, snapshot.days[0]).padEnd(22)} ${String(movies.length).padStart(
-        3,
-      )} filmova ${String(showtimes.length).padStart(4)} projekcija`,
-    );
+    // Split by city: a combined total hides one city failing entirely.
+    const perCity = CITIES.map((city) => {
+      const ids = new Set<string>(city.cinemaIds);
+      const showtimes = snapshot.movies
+        .flatMap((movie) => movie.showtimes)
+        .filter((showtime) => showtime.date === day && ids.has(showtime.cinemaId));
+      const movies = snapshot.movies.filter((movie) =>
+        movie.showtimes.some(
+          (showtime) => showtime.date === day && ids.has(showtime.cinemaId),
+        ),
+      );
+      return `${city.name}: ${String(movies.length).padStart(3)}f ${String(
+        showtimes.length,
+      ).padStart(4)}p`;
+    }).join('  ');
+    console.log(`${day} ${formatDayLabel(day, snapshot.days[0]).padEnd(22)} ${perCity}`);
   }
 
   console.log('\n=== TMDb ===');

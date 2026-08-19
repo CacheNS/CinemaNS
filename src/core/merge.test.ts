@@ -32,9 +32,9 @@ function raw(cinemaId: CinemaId, rawTitle: string, clean: string, extra: Partial
 test('merges the same film across cinemas despite different spellings', async () => {
   const { movies } = await mergeMovies(
     [
-      raw('arena', 'SPAJDERMEN:NOVI DAN 3D', 'SPAJDERMEN:NOVI DAN'),
-      raw('cinestar', 'Spajdermen: Novi dan', 'Spajdermen: Novi dan'),
-      raw('cineplexx', 'Spajdermen: Novi Dan', 'Spider-Man: Brand New Day'),
+      raw('arena-novi-sad', 'SPAJDERMEN:NOVI DAN 3D', 'SPAJDERMEN:NOVI DAN'),
+      raw('cinestar-novi-sad', 'Spajdermen: Novi dan', 'Spajdermen: Novi dan'),
+      raw('cineplexx-novi-sad', 'Spajdermen: Novi Dan', 'Spider-Man: Brand New Day'),
     ],
     offlineTmdb(),
   );
@@ -43,12 +43,47 @@ test('merges the same film across cinemas despite different spellings', async ()
   assert.equal(new Set(movies[0]!.showtimes.map((s) => s.cinemaId)).size, 3);
 });
 
+// The case that forced per-venue ids: five Cineplexx venues in Beograd would
+// otherwise all claim `cineplexx` and collapse into one block, showing Delta
+// City and Galerija showtimes as if they were the same building.
+test('venues of the same chain stay distinct after merging', async () => {
+  const { movies } = await mergeMovies(
+    [
+      raw('cineplexx-delta-city', 'Spajdermen: Novi dan', 'Spajdermen: Novi dan'),
+      raw('cineplexx-galerija', 'Spajdermen: Novi dan', 'Spajdermen: Novi dan'),
+      raw('cineplexx-novi-sad', 'Spajdermen: Novi dan', 'Spajdermen: Novi dan'),
+    ],
+    offlineTmdb(),
+  );
+
+  assert.equal(movies.length, 1);
+  assert.deepEqual(
+    [...new Set(movies[0]!.showtimes.map((s) => s.cinemaId))].sort(),
+    ['cineplexx-delta-city', 'cineplexx-galerija', 'cineplexx-novi-sad'],
+  );
+});
+
+// A film in both cities is one Movie with showtimes from both, which halves
+// the TMDb lookups; the split back into cities happens at render.
+test('a film showing in two cities merges into one entry', async () => {
+  const { movies } = await mergeMovies(
+    [
+      raw('arena-novi-sad', 'Vajana 2', 'Vajana 2'),
+      raw('cinestar-beograd-ada', 'Vajana 2', 'Vajana 2'),
+    ],
+    offlineTmdb(),
+  );
+
+  assert.equal(movies.length, 1);
+  assert.equal(movies[0]!.showtimes.length, 2);
+});
+
 test('matches a Serbian title against another cinema English title', async () => {
   const { movies } = await mergeMovies(
     [
-      raw('cinestar', 'Odiseja', 'Odiseja'),
+      raw('cinestar-novi-sad', 'Odiseja', 'Odiseja'),
       // Cineplexx publishes the English original as the searchable title.
-      raw('cineplexx', 'Odiseja', 'The Odyssey'),
+      raw('cineplexx-novi-sad', 'Odiseja', 'The Odyssey'),
     ],
     offlineTmdb(),
   );
@@ -58,7 +93,7 @@ test('matches a Serbian title against another cinema English title', async () =>
 
 test('keeps genuinely different films apart', async () => {
   const { movies } = await mergeMovies(
-    [raw('cinestar', 'Odiseja', 'Odiseja'), raw('arena', 'OPSESIJA', 'OPSESIJA')],
+    [raw('cinestar-novi-sad', 'Odiseja', 'Odiseja'), raw('arena-novi-sad', 'OPSESIJA', 'OPSESIJA')],
     offlineTmdb(),
   );
 
@@ -68,8 +103,8 @@ test('keeps genuinely different films apart', async () => {
 test('prefers a readable display title over the caps format-laden one', async () => {
   const { movies } = await mergeMovies(
     [
-      raw('arena', 'MALCI I MONSTRUMI 3D (sinhronizovano)', 'MALCI I MONSTRUMI'),
-      raw('cinestar', 'Malci i monstrumi', 'Malci i monstrumi'),
+      raw('arena-novi-sad', 'MALCI I MONSTRUMI 3D (sinhronizovano)', 'MALCI I MONSTRUMI'),
+      raw('cinestar-novi-sad', 'Malci i monstrumi', 'Malci i monstrumi'),
     ],
     offlineTmdb(),
   );
@@ -79,10 +114,10 @@ test('prefers a readable display title over the caps format-laden one', async ()
 
 test('dubbing is tracked per showtime and summarised on the movie', async () => {
   const mixed: RawMovie = {
-    cinemaId: 'cinestar',
+    cinemaId: 'cinestar-novi-sad',
     rawTitle: 'Vajana',
     cleanTitle: 'Vajana',
-    showtimes: [showtime('cinestar', '14:00', 'dubbed'), showtime('cinestar', '20:00', 'subtitled')],
+    showtimes: [showtime('cinestar-novi-sad', '14:00', 'dubbed'), showtime('cinestar-novi-sad', '20:00', 'subtitled')],
   };
 
   const { movies } = await mergeMovies([mixed], offlineTmdb());
@@ -92,7 +127,7 @@ test('dubbing is tracked per showtime and summarised on the movie', async () => 
 
 test('uses cinema genres for the kids heuristic when TMDb is unavailable', async () => {
   const { movies } = await mergeMovies(
-    [raw('cinestar', 'Vajana', 'Vajana', { genres: ['Animirani', 'Porodični'] })],
+    [raw('cinestar-novi-sad', 'Vajana', 'Vajana', { genres: ['Animirani', 'Porodični'] })],
     offlineTmdb(),
   );
 
@@ -101,17 +136,17 @@ test('uses cinema genres for the kids heuristic when TMDb is unavailable', async
 });
 
 test('an unrated film is never presented as kid friendly', async () => {
-  const { movies } = await mergeMovies([raw('arena', 'HAJDUK U BEOGRADU', 'HAJDUK U BEOGRADU')], offlineTmdb());
+  const { movies } = await mergeMovies([raw('arena-novi-sad', 'HAJDUK U BEOGRADU', 'HAJDUK U BEOGRADU')], offlineTmdb());
   assert.equal(movies[0]!.kidFriendly, false);
   assert.equal(movies[0]!.ageRating, undefined);
 });
 
 test('showtimes are sorted chronologically', async () => {
   const unsorted: RawMovie = {
-    cinemaId: 'cinestar',
+    cinemaId: 'cinestar-novi-sad',
     rawTitle: 'X',
     cleanTitle: 'X',
-    showtimes: [showtime('cinestar', '22:00', 'subtitled'), showtime('cinestar', '09:30', 'subtitled')],
+    showtimes: [showtime('cinestar-novi-sad', '22:00', 'subtitled'), showtime('cinestar-novi-sad', '09:30', 'subtitled')],
   };
 
   const { movies } = await mergeMovies([unsorted], offlineTmdb());
@@ -123,10 +158,10 @@ test('a labelled original title beats one scraped positionally', async () => {
     [
       // Arena has no original title for this film, so its page shows the
       // director in that position instead.
-      raw('arena', 'ASTRALNA PODMUKLOST', 'ASTRALNA PODMUKLOST', {
+      raw('arena-novi-sad', 'ASTRALNA PODMUKLOST', 'ASTRALNA PODMUKLOST', {
         originalTitle: 'Jacob Chase',
       }),
-      raw('cinestar', 'Astralna podmuklost', 'Astralna podmuklost', {
+      raw('cinestar-novi-sad', 'Astralna podmuklost', 'Astralna podmuklost', {
         originalTitle: 'Insidious: Out of the Further',
       }),
     ],
@@ -140,8 +175,8 @@ test('a labelled original title beats one scraped positionally', async () => {
 test('an exact running time beats a rounded one', async () => {
   const { movies } = await mergeMovies(
     [
-      raw('arena', 'SPAJDERMEN', 'SPAJDERMEN', { runtimeMinutes: 150 }),
-      raw('cineplexx', 'Spajdermen', 'Spider-Man', { runtimeMinutes: 145 }),
+      raw('arena-novi-sad', 'SPAJDERMEN', 'SPAJDERMEN', { runtimeMinutes: 150 }),
+      raw('cineplexx-novi-sad', 'Spajdermen', 'Spider-Man', { runtimeMinutes: 145 }),
     ],
     offlineTmdb(),
   );
@@ -152,8 +187,8 @@ test('an exact running time beats a rounded one', async () => {
 test('a domestic film is neither dubbed nor subtitled', async () => {
   const { movies } = await mergeMovies(
     [
-      raw('arena', 'HAJDUK U BEOGRADU DS', 'HAJDUK U BEOGRADU', { originCountry: 'RS' }),
-      raw('cinestar', 'Hajduk u Beogradu', 'Hajduk u Beogradu'),
+      raw('arena-novi-sad', 'HAJDUK U BEOGRADU DS', 'HAJDUK U BEOGRADU', { originCountry: 'RS' }),
+      raw('cinestar-novi-sad', 'Hajduk u Beogradu', 'Hajduk u Beogradu'),
     ],
     offlineTmdb(),
   );
@@ -163,7 +198,7 @@ test('a domestic film is neither dubbed nor subtitled', async () => {
   // The label must be consistent even for the cinema that said nothing.
   assert.ok(movies[0]?.showtimes.every((s) => s.audio === 'original'));
 
-  const foreign = await mergeMovies([raw('arena', 'THE ODYSSEY', 'THE ODYSSEY')], offlineTmdb());
+  const foreign = await mergeMovies([raw('arena-novi-sad', 'THE ODYSSEY', 'THE ODYSSEY')], offlineTmdb());
   assert.ok(foreign.movies[0]?.showtimes.every((s) => s.audio === 'subtitled'));
 });
 
@@ -194,8 +229,8 @@ test('a film is not split when only one cinema listing resolves to TMDb', async 
   // listing was only ever matched against other unresolved groups.
   const { movies } = await mergeMovies(
     [
-      raw('cineplexx', 'Spajdermen: Novi Dan', 'Spider-Man: Brand New Day'),
-      raw('arena', 'SPAJDERMEN:NOVI DAN 3D', 'SPAJDERMEN:NOVI DAN'),
+      raw('cineplexx-novi-sad', 'Spajdermen: Novi Dan', 'Spider-Man: Brand New Day'),
+      raw('arena-novi-sad', 'SPAJDERMEN:NOVI DAN 3D', 'SPAJDERMEN:NOVI DAN'),
     ],
     partialTmdb({ 'Spider-Man: Brand New Day': 1234 }),
   );
@@ -204,15 +239,15 @@ test('a film is not split when only one cinema listing resolves to TMDb', async 
   assert.equal(movies[0]?.tmdbId, 1234);
   assert.deepEqual(
     [...new Set(movies[0]!.showtimes.map((s) => s.cinemaId))].sort(),
-    ['arena', 'cineplexx'],
+    ['arena-novi-sad', 'cineplexx-novi-sad'],
   );
 });
 
 test('the unresolved listing may arrive first and still be adopted', async () => {
   const { movies } = await mergeMovies(
     [
-      raw('arena', 'SPAJDERMEN:NOVI DAN 3D', 'SPAJDERMEN:NOVI DAN'),
-      raw('cineplexx', 'Spajdermen: Novi Dan', 'Spider-Man: Brand New Day'),
+      raw('arena-novi-sad', 'SPAJDERMEN:NOVI DAN 3D', 'SPAJDERMEN:NOVI DAN'),
+      raw('cineplexx-novi-sad', 'Spajdermen: Novi Dan', 'Spider-Man: Brand New Day'),
     ],
     partialTmdb({ 'Spider-Man: Brand New Day': 1234 }),
   );

@@ -1,6 +1,7 @@
 import { cleanTitle, normalizeTitle, similarity, tidyDisplayTitle } from './titles.js';
 import { isKidFriendly, resolveAgeRating } from './ratings.js';
-import type { CinemaId, Diagnostics, Movie, RawMovie, Showtime } from './types.js';
+import { CINEMAS } from './types.js';
+import type { Chain, Diagnostics, Movie, RawMovie, Showtime } from './types.js';
 import { TmdbClient, type TmdbMovie } from '../tmdb/client.js';
 
 /** Two cinema titles below this similarity are treated as different films. */
@@ -11,15 +12,20 @@ const FUZZY_THRESHOLD = 0.82;
  * trusted. Cineplexx serves it from a structured API, CineStar labels the
  * fields explicitly, and Arena is scraped positionally out of prose — where a
  * missing original title leaves the director sitting in its place.
+ *
+ * Keyed by chain, not venue: how a site publishes its metadata is a property of
+ * the operator, so all five Beograd Cineplexx venues are trusted identically.
  */
-const METADATA_TRUST: Record<CinemaId, number> = {
+const METADATA_TRUST: Record<Chain, number> = {
   cineplexx: 0,
   cinestar: 1,
   arena: 2,
 };
 
 function byMetadataTrust(raws: RawMovie[]): RawMovie[] {
-  return [...raws].sort((a, b) => METADATA_TRUST[a.cinemaId] - METADATA_TRUST[b.cinemaId]);
+  return [...raws].sort(
+    (a, b) => METADATA_TRUST[CINEMAS[a.cinemaId].chain] - METADATA_TRUST[CINEMAS[b.cinemaId].chain],
+  );
 }
 
 /** Productions whose original language is Serbian, so they play untranslated. */

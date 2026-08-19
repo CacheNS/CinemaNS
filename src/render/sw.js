@@ -1,9 +1,13 @@
 /**
  * Offline shell for the installed app. Pages are network-first so the hourly
  * refresh always wins when there is a connection; assets are cache-first.
+ *
+ * Bump VERSION whenever cached markup changes in a way installed users must
+ * see — the activate handler deletes every cache whose key isn't the current
+ * one, so a rename here is what evicts stale branding from existing installs.
  */
-const VERSION = 'v1';
-const CACHE = `bioskopi-ns-${VERSION}`;
+const VERSION = 'v2';
+const CACHE = `kokice-${VERSION}`;
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

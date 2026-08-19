@@ -42,7 +42,7 @@ test('pairs Arena date tabs with their panes', () => {
 
   // Each tab is a distinct day, so showtimes must spread across several dates.
   assert.ok(new Set(showtimes.map((showtime) => showtime.date)).size >= 5);
-  assert.ok(showtimes.every((showtime) => showtime.cinemaId === 'arena'));
+  assert.ok(showtimes.every((showtime) => showtime.cinemaId === 'arena-novi-sad'));
 });
 
 test('reads dubbing from the Arena title', () => {

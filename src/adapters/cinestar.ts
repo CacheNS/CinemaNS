@@ -2,9 +2,8 @@ import * as cheerio from 'cheerio';
 import { fetchText, mapLimit } from '../core/http.js';
 import { normalizeTime } from '../core/dates.js';
 import { cleanTitle, detectAudio, detectFormat } from '../core/titles.js';
-import type { AdapterResult, Audio, RawMovie, Showtime } from '../core/types.js';
+import type { AdapterResult, Audio, CinemaId, RawMovie, Showtime } from '../core/types.js';
 
-const PAGE_URL = 'https://cinestarcinemas.rs/novi-sad-big';
 const ORIGIN = 'https://cinestarcinemas.rs';
 
 /**
@@ -51,7 +50,12 @@ export function formatFromCode(code: string): string {
   return premium ?? dimension ?? '2D';
 }
 
-export function parseCinestar(html: string, days: string[]): RawMovie[] {
+export function parseCinestar(
+  html: string,
+  days: string[],
+  cinemaId: CinemaId,
+  pageUrl: string,
+): RawMovie[] {
   const $ = cheerio.load(html);
   const movies: RawMovie[] = [];
   const wanted = new Set(days);
@@ -95,7 +99,7 @@ export function parseCinestar(html: string, days: string[]): RawMovie[] {
           ? href
           : href.startsWith('/')
             ? `${ORIGIN}${href}`
-            : PAGE_URL;
+            : pageUrl;
 
         // The title itself can carry the marker even when the code does not.
         const audioFromCode = audioFromFormatCode(code);
@@ -103,7 +107,7 @@ export function parseCinestar(html: string, days: string[]): RawMovie[] {
           audioFromCode !== 'unknown' ? audioFromCode : detectAudio(rawTitle);
 
         const showtime: Showtime = {
-          cinemaId: 'cinestar',
+          cinemaId,
           date,
           time,
           format: formatFromCode(code) || detectFormat(rawTitle),
@@ -119,7 +123,7 @@ export function parseCinestar(html: string, days: string[]): RawMovie[] {
     if (showtimes.length === 0) return;
 
     const movie: RawMovie = {
-      cinemaId: 'cinestar',
+      cinemaId,
       rawTitle,
       cleanTitle: cleanTitle(rawTitle),
       showtimes,
@@ -159,11 +163,17 @@ export function parseCinestarOriginalTitle(html: string): string | undefined {
   return original;
 }
 
-export async function scrapeCinestar(days: string[]): Promise<AdapterResult> {
+/** Scrapes one CineStar venue, addressed by the slug its own site uses. */
+export async function scrapeCinestar(
+  days: string[],
+  cinemaId: CinemaId,
+  slug: string,
+): Promise<AdapterResult> {
+  const pageUrl = `${ORIGIN}/${slug}`;
   // CineStar sits behind Cloudflare, which rejects plain scraper requests from
   // datacenter IPs such as the CI runner's.
-  const html = await fetchText(PAGE_URL, { browserLike: true, tlsFallback: true });
-  const movies = parseCinestar(html, days);
+  const html = await fetchText(pageUrl, { browserLike: true, tlsFallback: true });
+  const movies = parseCinestar(html, days, cinemaId, pageUrl);
 
   // One extra request per film, once an hour, is a fair price for showing the
   // original title. A failure here must never lose the showtimes.
@@ -179,5 +189,5 @@ export async function scrapeCinestar(days: string[]): Promise<AdapterResult> {
     }
   });
 
-  return { cinemaId: 'cinestar', movies };
+  return { cinemaId, movies };
 }

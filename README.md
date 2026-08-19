@@ -1,4 +1,4 @@
-# Cinemas in Novi Sad
+# Kokice
 
 **Live: <https://cachens.github.io/CinemaNS/>**
 
@@ -6,13 +6,25 @@
 > [`REQUIREMENTS.md`](REQUIREMENTS.md) first — it is the project's baseline
 > specification.
 
-The combined programme of three Novi Sad cinemas on one fast page:
+The combined programme of nine cinemas in two cities on one fast page.
+
+**Novi Sad**
 
 | Cinema | Source |
 |---|---|
 | Arena Cineplex Centar | film pages on `arenacineplex.com` (HTML) |
 | Cineplexx Promenada | JSON API `app.cineplexx.rs/api/v1` |
 | CineStar BIG | `cinestarcinemas.rs/novi-sad-big` (HTML) |
+
+**Beograd**
+
+| Cinema | Source |
+|---|---|
+| Cineplexx Delta City, Ušće, BIG, BEO, Galerija | JSON API `app.cineplexx.rs/api/v1` |
+| CineStar Ada Mall | `cinestarcinemas.rs/beograd-concept-cinema-ada-mall` (HTML) |
+
+Arena has no Belgrade venue — `arenacineplex.com` is a single cinema with no
+location selector at all.
 
 It shows today plus the next 7 days, grouped by film, with age ratings, audience
 score, runtime, format (2D/3D/4DX/IMAX/ScreenX) and whether a screening is
@@ -22,18 +34,34 @@ is in Serbian.
 ## How it works
 
 There is no server. Every hour GitHub Actions runs a build that scrapes all
-three sites, merges the films and generates static HTML; GitHub Pages serves it
+nine venues, merges the films and generates static HTML; GitHub Pages serves it
 from a CDN. A visitor's request never triggers scraping, so the page is instant
 and cannot go down — the worst case is slightly stale data.
 
 ```
 GitHub Actions (hourly cron)
-  arena | cineplexx | cinestar  (in parallel)
+  9 venues across Novi Sad + Beograd  (in parallel)
             ↓
      TMDb (titles, age ratings, scores)
             ↓
      merge by film → dist/ → GitHub Pages
 ```
+
+### Switching city
+
+Both cities are on the same page and the switch is instant, with no reload. That
+sounds wasteful and isn't: a day page is ~50–80 KB of very repetitive markup
+that gzips **11–14×**, and GitHub Pages does serve gzip. Both cities together
+land around 18 KB over the wire — less than a single poster image.
+
+The city is a property of each cinema block, so switching reuses the same filter
+loop the dubbing and kids filters already use. Blocks for every city but Novi
+Sad are rendered with `hidden` already set and JavaScript only ever *reveals*
+them, so with JS disabled the page is still a correct single-city page rather
+than a mix of both.
+
+The choice lives in the URL (`?grad=beograd`) and is remembered locally; an
+explicit link always wins over the remembered preference.
 
 ### Matching titles across cinemas
 
@@ -154,6 +182,14 @@ Then configure the repository once:
 
 The site will be at `https://<account>.github.io/CinemaNS/`.
 
+> **Why is the URL still `CinemaNS` when the app is called Kokice?** Renaming
+> the repository would change the published URL, breaking existing bookmarks and
+> links, orphaning installed PWA copies (their scope and `start_url` are
+> origin-relative) and resetting the analytics history — for a URL that still
+> would not be the real one, since `kokice.org` is not registered yet. The
+> rename is deliberately deferred so it can happen once, together with the
+> domain move.
+
 Every hour the workflow runs the build, commits `data/raw.json` (the last known
 good data, which also keeps the scheduled workflow alive) and deploys `dist/`.
 
@@ -206,7 +242,8 @@ it, so automation cannot inflate the count.
 Each cinema is an independent adapter. If one site changes its HTML, the build
 reuses that cinema's last known good data and prints a warning on the page that
 the data may be out of date; the other cinemas carry on as normal. The build
-only fails if all three sources fail.
+only fails if every source fails. Stale-data warnings are scoped to the city
+they belong to, so a Belgrade outage never worries a Novi Sad reader.
 
 To check the Cineplexx API contract, if their site stops returning data:
 
@@ -216,8 +253,10 @@ curl -s https://app.cineplexx.rs/api/v1/cinemas \
   -H 'client-key: 308330b1-52a5-4883-aee3-304240c22ea1' | head -c 400
 ```
 
-Novi Sad is `cinemaId` **1116**. If the `client-key` changes, find the new one
-in the site's JS bundle and set it as `CINEPLEXX_CLIENT_KEY`.
+That endpoint is also how the build resolves venue numbers: they are looked up
+by `cinemaUrlName` at scrape time and never hardcoded, because the live ids are
+non-contiguous (there is no 1114 or 1117). If the `client-key` changes, find the
+new one in the site's JS bundle and set it as `CINEPLEXX_CLIENT_KEY`.
 
 ## Layout
 

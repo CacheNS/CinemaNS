@@ -1,8 +1,8 @@
 {
-  "name": "cinema-ns",
+  "name": "kokice",
   "version": "1.0.0",
   "private": true,
-  "description": "Objedinjeni repertoar bioskopa u Novom Sadu",
+  "description": "Kokice — objedinjeni repertoar bioskopa u Novom Sadu",
   "type": "module",
   "engines": {
     "node": ">=22.9"
