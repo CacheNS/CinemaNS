@@ -1,0 +1,49 @@
+# Temporary diagnostic. CineStar returns 403 to the GitHub-hosted runner but 200
+# from a home connection, so the only place the failure can be studied is the
+# runner. Delete this workflow once a working strategy is known.
+name: cinestar-probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show egress IP
+        run: curl -s https://api.ipify.org; echo
+
+      - name: 1 plain curl
+        run: curl -s -o /dev/null -w "%{http_code}\n" https://cinestarcinemas.rs/novi-sad-big || true
+
+      - name: 2 browser headers
+        run: |
+          curl -s -o /dev/null -w "%{http_code}\n" https://cinestarcinemas.rs/novi-sad-big \
+            -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36' \
+            -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8' \
+            -H 'Accept-Language: sr-RS,sr;q=0.9,en;q=0.8' \
+            -H 'Sec-Fetch-Dest: document' -H 'Sec-Fetch-Mode: navigate' \
+            -H 'Sec-Fetch-Site: none' -H 'Sec-Fetch-User: ?1' \
+            -H 'Upgrade-Insecure-Requests: 1' || true
+
+      - name: 3 browser headers over HTTP/1.1
+        run: |
+          curl -s --http1.1 -o /dev/null -w "%{http_code}\n" https://cinestarcinemas.rs/novi-sad-big \
+            -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36' \
+            -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' || true
+
+      - name: 4 www hostname
+        run: curl -s -o /dev/null -w "%{http_code}\n" https://www.cinestarcinemas.rs/novi-sad-big || true
+
+      - name: 5 node fetch (what the build actually uses)
+        run: |
+          node -e "fetch('https://cinestarcinemas.rs/novi-sad-big').then(r=>console.log('node',r.status)).catch(e=>console.log('node err',e.message))"
+
+      - name: 6 IPv6
+        run: curl -s -6 -o /dev/null -w "%{http_code}\n" https://cinestarcinemas.rs/novi-sad-big || true
+
+      - name: 7 response body on failure
+        run: curl -s https://cinestarcinemas.rs/novi-sad-big | head -c 1200 || true
+
+      - name: 8 robots.txt (is anything served at all?)
+        run: curl -s -o /dev/null -w "%{http_code}\n" https://cinestarcinemas.rs/robots.txt || true
