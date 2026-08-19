@@ -272,10 +272,18 @@ new tab (`target="_blank" rel="noopener noreferrer"`). The link is built by
 `src/core/trailer.ts` and has two forms:
 
 - **Exact** — TMDb returned a YouTube video for the film, so the link opens it.
-  Preference is Serbian, then `sh`/`hr`/`bs`, then English; language outranks
+  Preference is strictly **Serbian → `sh`/`hr`/`bs` → English**; language outranks
   both video type and officiality, because a Serbian teaser serves this audience
   better than an official English trailer. Non-YouTube and unknown-language
-  videos are ignored.
+  videos are ignored. Within one language band a video tagged with country `RS`
+  wins — distributors sometimes label a Serbian upload `hr` — but country can
+  never lift a video above a higher language band.
+
+  The build logs the resulting distribution (`Trejleri: sr 3 · hr 5 · en 2 ·
+  pretraga 24`). This exists because the ranking is only worth as much as TMDb's
+  catalogue: when a poster opens a Croatian trailer it is almost always because
+  TMDb has no Serbian-tagged video for that film, and without the log that looks
+  indistinguishable from a ranking bug.
 - **Search** — otherwise the link is a YouTube search for
   `"<title> <original title> trailer srpski"`. This is deliberate: Serbian
   trailers are uploaded by local distributors (Blitz, MegaCom, Taramount) and
@@ -486,3 +494,55 @@ bug.
 **R-15.5** Age ratings are advisory. Serbia exposes no statutory cinema
 certification, so badges reflect the best available foreign certification, and
 the UI must keep stating the source country and marking guesses.
+
+**R-15.6** Analytics must stay cookieless (R-16.2). Anything that stores an id
+on the device drags in a consent banner and defeats R-2.1.
+
+---
+
+## 16. Analytics
+
+**R-16.1 Visit counting requires a client-side beacon.** GitHub Pages exposes
+no access logs and no analytics API, and the repository traffic API counts views
+of the *repo page on github.com*, not of the published site. So the only
+possible source of visit data is the visitor's own browser.
+
+**R-16.2 Cloudflare Web Analytics, chosen for being cookieless.** It sets no
+cookies, stores nothing on the device and does not fingerprint, so under GDPR
+and Serbia's ZZPL the site needs **no consent banner**. That was the deciding
+factor: a consent dialog on a page whose whole purpose is to answer a question
+in two seconds would cost more than the numbers are worth. Google Analytics was
+rejected for exactly this reason.
+
+**R-16.3 The beacon tag must mirror Cloudflare's issued snippet**, including
+`type="module"`. `beacon.min.js` is served as an ES module, so emitting it as a
+classic `defer` script risks a parse-time failure. A module script is deferred
+by default, so this still never blocks rendering (R-2.2). Do not hand-tune the
+tag.
+
+**R-16.4 The site tag lives in a repository *variable*, never a secret.** The
+token is embedded in the HTML of every page and is readable with View Source, so
+a secret would imply a confidentiality that does not exist — and GitHub's log
+masking would make a build that silently skipped analytics harder to diagnose.
+The workflow passes `CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}`.
+
+**R-16.5 Analytics is optional and off by default.** With no token the build
+emits no beacon, no analytics request and no footer privacy note, and succeeds
+normally — the same rule TMDb follows (R-5.3). Deleting the variable is
+therefore a complete off switch requiring no code change.
+
+**R-16.6 A malformed token is skipped with a warning, not rendered.** The value
+is pasted by hand; a mistyped token that still rendered would look like working
+analytics while recording nothing. Only 32 hexadecimal characters are accepted,
+which also prevents the value breaking out of the attribute it sits in.
+
+**R-16.7 The footer states that counting happens**, in Serbian, and only when
+analytics is actually enabled — the site must not claim to measure something it
+is not measuring.
+
+**R-16.8 The token is not hardcoded**, so that a fork does not silently report
+its visitors to this project's Cloudflare account.
+
+**R-16.9 Figures are a floor, not a census.** Ad blockers and privacy browsers
+suppress the beacon. The hourly CI build never executes it, so automation cannot
+inflate the count.

@@ -1,4 +1,5 @@
 import { formatDayLabel, formatDayShort, formatTimestamp } from '../core/dates.js';
+import { analyticsSnippet } from './analytics.js';
 import { trailerLink } from '../core/trailer.js';
 import { CINEMAS, CINEMA_IDS } from '../core/types.js';
 import type { Movie, Showtime, Snapshot } from '../core/types.js';
@@ -336,9 +337,16 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
        informativne i preuzete iz TMDb baze — proverite zvaničnu oznaku na sajtu
        bioskopa.</p>
     <p><a href="data.json">Svi podaci u JSON formatu</a></p>
+    ${
+      process.env['CF_BEACON_TOKEN']?.trim()
+        ? `<p class="footer__privacy">Broj poseta se meri anonimno (Cloudflare Web
+       Analytics). Ne koriste se kolačići i ne prikupljaju se lični podaci.</p>`
+        : ''
+    }
   </footer>
 
   <script src="assets/app.js" defer></script>
+  ${analyticsSnippet(process.env['CF_BEACON_TOKEN'])}
 </body>
 </html>
 `;

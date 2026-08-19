@@ -47,6 +47,9 @@ jobs:
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           CINEPLEXX_CLIENT_KEY: ${{ vars.CINEPLEXX_CLIENT_KEY }}
+          # A variable, not a secret: the beacon token is public by definition,
+          # since it ships in the HTML of every page.
+          CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}
 
       # The last good scrape is committed so the next run can fall back to it
       # when a cinema is down. It also keeps the scheduled workflow alive, which
