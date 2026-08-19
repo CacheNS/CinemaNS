@@ -375,6 +375,14 @@ it must be overridable without a rebuild).
 **R-13.5** Pages source must be set to **GitHub Actions** in repository
 settings.
 
+**R-13.6** The repository must be **public**. GitHub Pages on a private
+repository requires a paid plan, which would break R-2.4 (zero cost).
+
+**R-13.7** The project must live in a **real repository, not a fork**. GitHub
+disables `schedule` workflows in forked repositories, which would silently kill
+the hourly refresh (R-2.1). To move the project between accounts, use
+*Settings → Transfer ownership*, which keeps history and redirects the old URL.
+
 ---
 
 ## 14. Open items
@@ -389,8 +397,24 @@ degrades gracefully, but §6 is effectively inactive. This is the single highest
 title, because there is no second source to outrank Arena. Accepted; no reliable
 heuristic was found.
 
-**R-14.3 OPEN — not yet deployed.** Requires pushing the branch, setting Pages
-source to GitHub Actions, and adding the `TMDB_API_KEY` secret.
+**R-14.3 OPEN — not yet published.** The code is committed locally but has
+never been pushed: the remote `CacheNS/CinemaNS` has no branches yet.
+
+Publishing is blocked on repository access, not on the code. The session that
+built this is authenticated as `dkrivosija_microsoft`, which has only `pull`
+permission on `CacheNS/CinemaNS` (a different, personal account) and has no SSH
+key. Publishing under the authenticated account instead is also impossible: it
+is an Enterprise Managed User, which cannot create public repositories, and a
+private repository cannot use free Pages (R-13.6). A fork is ruled out by
+R-13.7.
+
+So the remaining step needs an account with push access to `CacheNS/CinemaNS`:
+
+```bash
+git push -u origin HEAD:main
+```
+
+then Pages source → GitHub Actions, and the `TMDB_API_KEY` secret (R-14.1).
 
 ---
 

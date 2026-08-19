@@ -77,15 +77,33 @@ poslednje učitanim repertoarom.
 
 ## Deploy
 
-`.github/workflows/build.yml` radi sve automatski. Potrebno je jednom podesiti:
+`.github/workflows/build.yml` radi sve automatski. Prvo objavljivanje:
+
+```bash
+# 1. Objavi kod kao main granu (potreban je nalog sa push pravom na repo)
+git push -u origin HEAD:main
+```
+
+Zatim jednom podesi repozitorijum:
 
 1. **Settings → Pages → Source: GitHub Actions**
 2. **Settings → Secrets and variables → Actions**
-   - secret `TMDB_API_KEY`
+   - secret `TMDB_API_KEY` — bez njega nema uzrasnih oznaka ni ocena
    - (opciono) variable `CINEPLEXX_CLIENT_KEY`
+3. **Actions → Build and deploy → Run workflow** za prvi build, ili sačekaj
+   sledeći pun sat.
+
+Sajt će biti na `https://<nalog>.github.io/CinemaNS/`.
 
 Workflow svakog sata pokreće build, komituje `data/raw.json` (poslednji dobar
 podatak, ujedno drži scheduled workflow živim) i deployuje `dist/`.
+
+> **Repozitorijum mora biti javan.** GitHub Pages na privatnim repozitorijumima
+> zahteva plaćeni plan. Takođe, **fork ne radi** — GitHub isključuje `schedule`
+> workflow-e u forkovanim repozitorijumima, čime bi osvežavanje na sat vremena
+> prestalo da radi. Ako projekat treba da promeni vlasnika, koristi
+> Settings → Transfer ownership umesto forka: istorija ostaje, a stari URL se
+> preusmerava.
 
 ## Kada nešto pukne
 
