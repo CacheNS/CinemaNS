@@ -1,0 +1,25 @@
+{
+  "name": "cinema-ns",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Objedinjeni repertoar bioskopa u Novom Sadu",
+  "type": "module",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "compile": "tsc",
+    "build": "npm run compile && node --env-file-if-exists=.env lib/build.js",
+    "report": "npm run compile && node --env-file-if-exists=.env lib/report.js",
+    "serve": "node lib/serve.js",
+    "test": "npm run compile && node --test \"lib/**/*.test.js\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}
