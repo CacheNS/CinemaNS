@@ -1,4 +1,4 @@
-import { fetchJson } from '../core/http.js';
+import { fetchJson, HttpError } from '../core/http.js';
 import { normalizeTitle, similarity } from '../core/titles.js';
 
 const API_BASE = 'https://api.themoviedb.org/3';
@@ -70,6 +70,7 @@ export class TmdbClient {
   private readonly cache = new Map<string, TmdbMovie | null>();
   private readonly overrides: Map<string, number>;
   private failures = 0;
+  private warnedAboutAuth = false;
 
   constructor(
     private readonly apiKey: string | undefined,
@@ -104,13 +105,31 @@ export class TmdbClient {
     let result: TmdbMovie | null = null;
     try {
       result = await this.lookup(key, lookup);
-    } catch {
-      this.failures += 1;
+    } catch (error) {
+      this.noteFailure(error);
       result = null;
     }
 
     this.cache.set(key, result);
     return result;
+  }
+
+  /**
+   * A rejected key is worth saying out loud once. Pasting the v4 "API Read
+   * Access Token" where the v3 key belongs is an easy mistake, and otherwise it
+   * looks identical to having no key at all: the build succeeds and quietly
+   * reports zero matches.
+   */
+  private noteFailure(error: unknown): void {
+    this.failures += 1;
+    const status = error instanceof HttpError ? error.status : undefined;
+    if ((status === 401 || status === 403) && !this.warnedAboutAuth) {
+      this.warnedAboutAuth = true;
+      console.warn(
+        `TMDb je odbio ključ (HTTP ${status}). Očekuje se "API Key (v3 auth)", ` +
+          'a ne "API Read Access Token". Nastavljam bez TMDb-a.',
+      );
+    }
   }
 
   private async lookup(key: string, lookup: TmdbLookup): Promise<TmdbMovie | null> {

@@ -1,120 +1,156 @@
-# Bioskopi u Novom Sadu
+# Cinemas in Novi Sad
 
-**Uživo: <https://cachens.github.io/CinemaNS/>**
+**Live: <https://cachens.github.io/CinemaNS/>**
 
-> **Menjaš nešto u ovom repozitorijumu?** Prvo pročitaj
-> [`REQUIREMENTS.md`](REQUIREMENTS.md) — to je osnovna specifikacija projekta.
+> **Changing anything in this repository?** Read
+> [`REQUIREMENTS.md`](REQUIREMENTS.md) first — it is the project's baseline
+> specification.
 
-Objedinjen repertoar tri novosadska bioskopa na jednoj brzoj stranici:
+The combined programme of three Novi Sad cinemas on one fast page:
 
-| Bioskop | Izvor |
+| Cinema | Source |
 |---|---|
-| Arena Cineplex Centar | HTML stranice filmova na `arenacineplex.com` |
+| Arena Cineplex Centar | film pages on `arenacineplex.com` (HTML) |
 | Cineplexx Promenada | JSON API `app.cineplexx.rs/api/v1` |
-| CineStar BIG | HTML stranica `cinestarcinemas.rs/novi-sad-big` |
+| CineStar BIG | `cinestarcinemas.rs/novi-sad-big` (HTML) |
 
-Prikazuje današnji dan i narednih 7 dana, grupisano po filmu, sa uzrasnim
-oznakama, ocenom publike, trajanjem, formatom (2D/3D/4DX/IMAX/ScreenX) i
-oznakom da li je projekcija sinhronizovana ili titlovana.
+It shows today plus the next 7 days, grouped by film, with age ratings, audience
+score, runtime, format (2D/3D/4DX/IMAX/ScreenX) and whether a screening is
+dubbed or subtitled. The interface itself is in Serbian.
 
-## Kako radi
+## How it works
 
-Nema servera. GitHub Actions svakog sata pokrene build koji skenira sva tri
-sajta, spoji filmove i generiše statične HTML stranice; GitHub Pages ih servira
-sa CDN-a. Zahtev korisnika nikada ne pokreće skrejpovanje, pa je stranica
-trenutna i ne može da "padne" — najgori slučaj je da su podaci malo stariji.
+There is no server. Every hour GitHub Actions runs a build that scrapes all
+three sites, merges the films and generates static HTML; GitHub Pages serves it
+from a CDN. A visitor's request never triggers scraping, so the page is instant
+and cannot go down — the worst case is slightly stale data.
 
 ```
-GitHub Actions (cron, na sat vremena)
-  arena | cineplexx | cinestar  (paralelno)
+GitHub Actions (hourly cron)
+  arena | cineplexx | cinestar  (in parallel)
             ↓
-     TMDb (naslovi, uzrast, ocene)
+     TMDb (titles, age ratings, scores)
             ↓
-     spajanje po filmu → dist/ → GitHub Pages
+     merge by film → dist/ → GitHub Pages
 ```
 
-### Spajanje naslova
+### Matching titles across cinemas
 
-Isti film se u svakom bioskopu piše drugačije, čas na srpskom, čas na engleskom
-("SPAJDERMEN:NOVI DAN" / "Spajdermen: Novi dan 3D" / "Spider-Man: Brand New
-Day"). Naslovi se prvo normalizuju (ćirilica → latinica, uklanjanje dijakritika
-i oznaka formata), a zatim se, kada je TMDb dostupan, film svodi na TMDb id koji
-je stvarni ključ spajanja. Bez TMDb ključa spajanje pada na poređenje svih
-varijanti naslova (Dice sličnost). Izuzeci se ručno rešavaju u
-`data/title-overrides.json` bez promene koda.
+The same film is spelled differently at every cinema, sometimes in Serbian and
+sometimes in English ("SPAJDERMEN:NOVI DAN" / "Spajdermen: Novi dan 3D" /
+"Spider-Man: Brand New Day"). Titles are first normalized (Cyrillic → Latin,
+diacritics and format markers removed), and then — when TMDb is available — each
+film is reduced to a TMDb id, which is the real merge key. Without a TMDb key,
+merging falls back to comparing every title variant (Dice similarity).
+Exceptions are fixed by hand in `data/title-overrides.json`, with no code
+change.
 
-### Uzrast i ocene
+### Age ratings and scores
 
-Bioskopi ne objavljuju upotrebljivu uzrasnu oznaku (Cineplexx za svaki film
-vraća `o.A.`), pa se koristi TMDb: sertifikacija po redosledu RS → HR → SI →
-DE/AT → GB → US, svedena na broj godina. Kada sertifikata nema, koristi se
-procena po žanru koja je vidljivo označena kao procena. Ocena publike je TMDb
-`vote_average` i prikazuje se tek od 20 glasova naviše.
+The cinemas do not publish a usable age rating (Cineplexx returns `o.A.` for
+every film), so TMDb is used instead: certifications in the order
+RS → HR → SI → DE/AT → GB → US, reduced to a minimum age. Where no certification
+exists, a genre-based guess is used and is **visibly marked as a guess**. The
+audience score is TMDb's `vote_average`, shown only from 20 votes upwards.
 
-**Bez `TMDB_API_KEY` sajt i dalje radi**, ali nema uzrasnih oznaka ni ocena, a
-filtriranje "Za decu" oslanja se samo na žanr.
+**Without `TMDB_API_KEY` the site still works**, but there are no age ratings
+and no scores, and the "for children" filter relies on genre alone.
 
-## Lokalno pokretanje
+## The TMDb key
+
+Use the **API Key (v3 auth)** — the short 32-character hex string — **not** the
+"API Read Access Token" (the long JWT starting with `eyJ`). This client
+authenticates with `?api_key=…`, which is v3 auth; the read access token is a v4
+bearer credential and is rejected on that endpoint.
+
+Get one at <https://www.themoviedb.org/settings/api> (free, requires an
+account).
+
+Where it goes:
+
+| Where | What |
+|---|---|
+| GitHub Actions | a **repository secret** named `TMDB_API_KEY` — Settings → Secrets and variables → Actions → *Secrets* tab → New repository secret |
+| Locally | an environment variable, most easily via a `.env` file (see `.env.example`) |
+
+It must be a *secret*, not a *variable*: repository variables are visible to
+anyone who can see the repo, and are exposed in build logs. The workflow passes
+the secret to the build as an environment variable, so both environments use the
+same code path.
+
+Worth checking the key before saving it, which is quicker than waiting an hour
+for a build to tell you it was the wrong one:
+
+```bash
+curl -s "https://api.themoviedb.org/3/movie/550?api_key=YOUR_KEY" | head -c 200
+# a film title  => the key works
+# {"status_code":7,...} => invalid key, or you pasted the v4 read access token
+```
+
+`TMDB_API_KEY` is deliberately optional at every level, so a missing or invalid
+key degrades the site rather than failing the build (see R-5.3 in
+`REQUIREMENTS.md`).
+
+## Running locally
 
 ```bash
 npm install
-cp .env.example .env      # pa upiši TMDB_API_KEY (opciono, ali preporučeno)
+cp .env.example .env      # then fill in TMDB_API_KEY (optional but recommended)
 
-npm run build             # skrejpuje sve i generiše dist/
+npm run build             # scrapes everything and generates dist/
 npm run serve             # http://localhost:3000
-npm run report            # dijagnostika bez generisanja sajta
-npm test                  # testovi na sačuvanim fixture fajlovima, bez mreže
+npm run report            # diagnostics only, without generating the site
+npm test                  # tests against saved fixtures, no network
 ```
 
-`npm run report` ispisuje broj filmova i projekcija po bioskopu, pokrivenost
-TMDb-om, koliko je filmova spojeno između bioskopa i koliko projekcija ima
-nepoznat jezik — najbrži način da se vidi da li je neki parser pukao.
+`npm run report` prints the number of films and screenings per cinema, TMDb
+coverage, how many films were merged across cinemas and how many screenings have
+an unknown language — the quickest way to see whether a parser has broken.
 
-## Instalacija kao aplikacija
+## Installing as an app
 
-Sajt je PWA. Na Androidu (Chrome) dugme u podnožju pokreće pravu instalaciju.
-Na iPhone-u Safari nema automatsku instalaciju, pa dugme prikazuje uputstvo:
-**Podeli → „Dodaj na početni ekran“**. Instalirana verzija radi i offline sa
-poslednje učitanim repertoarom.
+The site is a PWA. On Android (Chrome) the button in the footer triggers a real
+install. iPhone Safari has no automatic install, so the button shows the
+instructions instead: **Share → "Add to Home Screen"**. The installed version
+also works offline with the programme it last loaded.
 
-## Deploy
+## Deploying
 
-`.github/workflows/build.yml` radi sve automatski. Prvo objavljivanje:
+`.github/workflows/build.yml` does everything automatically. First publish:
 
 ```bash
-# 1. Objavi kod kao main granu (potreban je nalog sa push pravom na repo)
+# Publish the code as the main branch (needs an account with push access)
 git push -u origin HEAD:main
 ```
 
-Zatim jednom podesi repozitorijum:
+Then configure the repository once:
 
 1. **Settings → Pages → Source: GitHub Actions**
 2. **Settings → Secrets and variables → Actions**
-   - secret `TMDB_API_KEY` — bez njega nema uzrasnih oznaka ni ocena
-   - (opciono) variable `CINEPLEXX_CLIENT_KEY`
-3. **Actions → Build and deploy → Run workflow** za prvi build, ili sačekaj
-   sledeći pun sat.
+   - secret `TMDB_API_KEY` — without it there are no age ratings or scores
+   - (optional) variable `CINEPLEXX_CLIENT_KEY`
+3. **Actions → Build and deploy → Run workflow** for the first build, or wait
+   for the next full hour.
 
-Sajt će biti na `https://<nalog>.github.io/CinemaNS/`.
+The site will be at `https://<account>.github.io/CinemaNS/`.
 
-Workflow svakog sata pokreće build, komituje `data/raw.json` (poslednji dobar
-podatak, ujedno drži scheduled workflow živim) i deployuje `dist/`.
+Every hour the workflow runs the build, commits `data/raw.json` (the last known
+good data, which also keeps the scheduled workflow alive) and deploys `dist/`.
 
-> **Repozitorijum mora biti javan.** GitHub Pages na privatnim repozitorijumima
-> zahteva plaćeni plan. Takođe, **fork ne radi** — GitHub isključuje `schedule`
-> workflow-e u forkovanim repozitorijumima, čime bi osvežavanje na sat vremena
-> prestalo da radi. Ako projekat treba da promeni vlasnika, koristi
-> Settings → Transfer ownership umesto forka: istorija ostaje, a stari URL se
-> preusmerava.
+> **The repository must be public.** GitHub Pages on private repositories
+> requires a paid plan. Also, **a fork will not work** — GitHub disables
+> `schedule` workflows in forked repositories, which would stop the hourly
+> refresh. If the project needs to change owner, use Settings → Transfer
+> ownership rather than forking: the history is kept and the old URL redirects.
 
-## Kada nešto pukne
+## When something breaks
 
-Svaki bioskop je nezavisan adapter. Ako jedan sajt promeni HTML, build koristi
-poslednje dobre podatke tog bioskopa i na stranici ispiše upozorenje da podaci
-možda nisu ažurni; ostali bioskopi rade normalno. Build pada tek ako sva tri
-izvora otkažu.
+Each cinema is an independent adapter. If one site changes its HTML, the build
+reuses that cinema's last known good data and prints a warning on the page that
+the data may be out of date; the other cinemas carry on as normal. The build
+only fails if all three sources fail.
 
-Provera Cineplexx API ugovora, ako njihov sajt prestane da vraća podatke:
+To check the Cineplexx API contract, if their site stops returning data:
 
 ```bash
 curl -s https://app.cineplexx.rs/api/v1/cinemas \
@@ -122,16 +158,16 @@ curl -s https://app.cineplexx.rs/api/v1/cinemas \
   -H 'client-key: 308330b1-52a5-4883-aee3-304240c22ea1' | head -c 400
 ```
 
-Novi Sad je `cinemaId` **1116**. Ako se `client-key` promeni, naći ga u JS
-bundle-u sajta i postaviti kao `CINEPLEXX_CLIENT_KEY`.
+Novi Sad is `cinemaId` **1116**. If the `client-key` changes, find the new one
+in the site's JS bundle and set it as `CINEPLEXX_CLIENT_KEY`.
 
-## Struktura
+## Layout
 
 ```
-src/adapters/   po jedan skrejper za svaki bioskop
-src/core/       tipovi, datumi, HTTP, normalizacija naslova, spajanje, uzrast
-src/tmdb/       TMDb klijent (pretraga, alternativni naslovi, sertifikacije)
-src/render/     HTML, CSS, klijentski JS, PWA ikonice i manifest
-fixtures/       sačuvani HTML/JSON za testove (bez mreže)
-data/           raw.json (poslednji dobar podatak) i title-overrides.json
+src/adapters/   one scraper per cinema
+src/core/       types, dates, HTTP, title normalization, merging, age ratings
+src/tmdb/       TMDb client (search, alternative titles, certifications)
+src/render/     HTML, CSS, client-side JS, PWA icons and manifest
+fixtures/       saved HTML/JSON for tests (no network)
+data/           raw.json (last known good data) and title-overrides.json
 ```

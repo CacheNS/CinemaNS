@@ -50,6 +50,9 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
 - CineStar's `.age` field holds genre, not an age rating.
 - Domestic Serbian films are `audio: 'original'` ("domaći film"), remapped at
   merge level so all three cinemas agree.
+- CineStar is behind Cloudflare and 403s from datacenter IPs, so it alone is
+  fetched with `browserLike: true` browser headers (R-2.7a); 403 is retryable.
+  A scraper can fail in CI while passing locally — read the Actions log.
 
 ## Conventions
 

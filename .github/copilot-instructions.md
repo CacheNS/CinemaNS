@@ -42,6 +42,9 @@ These look like trivia, but each one was a real bug. See §10 of
 - CineStar's `.age` field contains **genre**, not an age rating.
 - Domestic Serbian films are `audio: 'original'` ("domaći film"), never
   "titlovano" — and the remap happens at merge level so all cinemas agree.
+- CineStar is behind Cloudflare and 403s from datacenter IPs, so it alone is
+  fetched with `browserLike: true` browser headers (R-2.7a). A scraper can fail
+  in CI while passing locally — read the Actions log, don't re-run locally.
 
 ## Working in this repo
 

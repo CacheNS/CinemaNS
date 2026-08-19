@@ -160,7 +160,9 @@ export function parseCinestarOriginalTitle(html: string): string | undefined {
 }
 
 export async function scrapeCinestar(days: string[]): Promise<AdapterResult> {
-  const html = await fetchText(PAGE_URL);
+  // CineStar sits behind Cloudflare, which rejects plain scraper requests from
+  // datacenter IPs such as the CI runner's.
+  const html = await fetchText(PAGE_URL, { browserLike: true });
   const movies = parseCinestar(html, days);
 
   // One extra request per film, once an hour, is a fair price for showing the
@@ -168,7 +170,9 @@ export async function scrapeCinestar(days: string[]): Promise<AdapterResult> {
   await mapLimit(movies, 3, async (movie) => {
     if (!movie.detailUrl) return;
     try {
-      const original = parseCinestarOriginalTitle(await fetchText(movie.detailUrl));
+      const original = parseCinestarOriginalTitle(
+        await fetchText(movie.detailUrl, { browserLike: true }),
+      );
       if (original) movie.originalTitle = original;
     } catch {
       /* the listing data is enough on its own */

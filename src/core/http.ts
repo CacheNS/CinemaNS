@@ -33,12 +33,37 @@ async function politeGate(host: string): Promise<void> {
   queueMicrotask(release);
 }
 
+/**
+ * Cloudflare scores requests partly on whether they look like a real browser
+ * navigation, and it is stricter about datacenter IPs — which is exactly what a
+ * GitHub Actions runner has. A scraper sending only a custom User-Agent gets
+ * 403 from the runner while working fine from a home connection, so sites
+ * behind such protection get the full header set a browser would send.
+ */
+const BROWSER_HEADERS: Record<string, string> = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  Accept:
+    'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'sr-RS,sr;q=0.9,en;q=0.8',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'sec-ch-ua': '"Chromium";v="120", "Not(A:Brand";v="24", "Google Chrome";v="120"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+};
+
 export interface FetchOptions {
   headers?: Record<string, string>;
   timeoutMs?: number;
   retries?: number;
   /** Treat these status codes as an empty (not failed) result. */
   acceptEmptyStatus?: number[];
+  /** Present as a browser. Needed for hosts behind bot protection. */
+  browserLike?: boolean;
 }
 
 export class HttpError extends Error {
@@ -59,17 +84,28 @@ async function fetchOnce(url: string, options: FetchOptions): Promise<Response> 
   );
   try {
     return await fetch(url, {
-      headers: {
-        'User-Agent': USER_AGENT,
-        'Accept-Language': 'sr-RS,sr;q=0.9,en;q=0.8',
-        ...options.headers,
-      },
+      headers: options.browserLike
+        ? { ...BROWSER_HEADERS, ...options.headers }
+        : {
+            'User-Agent': USER_AGENT,
+            'Accept-Language': 'sr-RS,sr;q=0.9,en;q=0.8',
+            ...options.headers,
+          },
       signal: controller.signal,
       redirect: 'follow',
     });
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * 4xx normally means "asking again will not help", but a 403 from bot
+ * protection is a scoring decision rather than a statement about the resource,
+ * and it does sometimes pass on a later attempt.
+ */
+function worthRetrying(status: number): boolean {
+  return status >= 500 || status === 429 || status === 403;
 }
 
 async function request(url: string, options: FetchOptions): Promise<Response> {
@@ -84,13 +120,12 @@ async function request(url: string, options: FetchOptions): Promise<Response> {
       const response = await fetchOnce(url, options);
       if (response.ok) return response;
       if (options.acceptEmptyStatus?.includes(response.status)) return response;
-      // 4xx other than 429 will not improve on retry.
-      if (response.status < 500 && response.status !== 429) {
+      if (!worthRetrying(response.status)) {
         throw new HttpError(url, response.status);
       }
       lastError = new HttpError(url, response.status);
     } catch (error) {
-      if (error instanceof HttpError && error.status < 500 && error.status !== 429) {
+      if (error instanceof HttpError && !worthRetrying(error.status)) {
         throw error;
       }
       lastError = error;

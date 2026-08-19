@@ -53,6 +53,21 @@ must not pretend otherwise.
 **R-2.7 Politeness.** One refresh per hour, sequential per host, small delay,
 descriptive User-Agent. Arena requires N+1 requests (one page per film).
 
+**R-2.7a CineStar is the exception to R-2.7's descriptive User-Agent.**
+`cinestarcinemas.rs` sits behind Cloudflare, which returns **HTTP 403 to
+datacenter IPs** — the site scrapes fine from a home connection with any
+User-Agent, including none, but fails from GitHub Actions runners. Evidence: a
+CI run logged `[cinestar] neuspeh: HTTP 403`, while the identical request from a
+local machine returned 200; the response carries `Server: cloudflare`. CineStar
+is therefore fetched with `browserLike: true`, which sends a full browser header
+set (`Sec-Fetch-*`, `sec-ch-ua`, `Upgrade-Insecure-Requests`, browser UA).
+Arena and Cineplexx keep the honest `CinemaNS` User-Agent. Do not switch other
+adapters to `browserLike` without the same evidence of a block.
+
+**R-2.7b A 403 is retryable.** Unlike other 4xx codes, a 403 from bot
+protection is a scoring decision about the caller rather than a statement about
+the resource, so it gets the same backoff retry as 429 and 5xx.
+
 ---
 
 ## 3. Architecture (fixed decisions)
@@ -335,6 +350,11 @@ parser surfaces as a red build rather than a silently empty site.
 
 **R-11.7** The build reports TMDb resolution coverage so degradation is visible.
 
+**R-11.8 A scraper can fail in CI while passing locally.** Bot protection keys
+off the caller's IP, so "it works on my machine" proves nothing about the
+runner. When a source is stale on the live site, read the Actions log for the
+adapter's `neuspeh:` line rather than re-running the build locally.
+
 ---
 
 ## 12. Testing
@@ -368,9 +388,16 @@ on push, and on `workflow_dispatch`.
 provides last-good fallback and counts as repository activity — scheduled
 workflows are auto-disabled after 60 days of inactivity.
 
-**R-13.4** `TMDB_API_KEY` is a repository **secret**; `CINEPLEXX_CLIENT_KEY` is
-a variable with a known default (it is a public value from their web bundle, so
-it must be overridable without a rebuild).
+**R-13.4** `TMDB_API_KEY` is a repository **secret** (never a variable, which is
+readable by anyone who can see the repo and is exposed in logs);
+`CINEPLEXX_CLIENT_KEY` is a variable with a known default (it is a public value
+from their web bundle, so it must be overridable without a rebuild).
+
+**R-13.4a** `TMDB_API_KEY` must be TMDb's **API Key (v3 auth)** — the 32-char
+hex string. The client authenticates with `?api_key=`, so the v4 "API Read
+Access Token" (a JWT) is rejected. Because a rejected key otherwise looks
+exactly like having no key, the client logs an explicit one-time warning naming
+the likely cause on HTTP 401/403.
 
 **R-13.5** Pages source must be set to **GitHub Actions** in repository
 settings.
@@ -391,7 +418,7 @@ the hourly refresh (R-2.1). To move the project between accounts, use
 `TMDb 0/61`. Until a key is supplied there are **no age ratings, no scores, and
 weaker cross-language matching**, and "Za decu" is genre guesswork. Everything
 degrades gracefully, but §6 is effectively inactive. This is the single highest
--value outstanding item.
+-value outstanding item. See R-13.4a for which key type to use.
 
 **R-14.2 OPEN — Arena-only films** can still show a director as the original
 title, because there is no second source to outrank Arena. Accepted; no reliable
