@@ -267,6 +267,27 @@ naming the source country.
 **R-8.9** Cards and chips carry `data-audio`, `data-min-age`,
 `data-kid-friendly`, `data-rating-confident` for the filters.
 
+**R-8.10 The poster links to a trailer.** Clicking a poster opens a trailer in a
+new tab (`target="_blank" rel="noopener noreferrer"`). The link is built by
+`src/core/trailer.ts` and has two forms:
+
+- **Exact** — TMDb returned a YouTube video for the film, so the link opens it.
+  Preference is Serbian, then `sh`/`hr`/`bs`, then English; language outranks
+  both video type and officiality, because a Serbian teaser serves this audience
+  better than an official English trailer. Non-YouTube and unknown-language
+  videos are ignored.
+- **Search** — otherwise the link is a YouTube search for
+  `"<title> <original title> trailer srpski"`. This is deliberate: Serbian
+  trailers are uploaded by local distributors (Blitz, MegaCom, Taramount) and
+  are often missing from TMDb, so a query that finds one beats guessing a video
+  id. The tooltip is worded accordingly ("Pogledaj trailer" vs "Potraži trailer
+  na YouTube-u"), so the link never overstates what it knows.
+
+**R-8.11** The trailer link must work without a TMDb key, and must exist even
+for a film with no poster — the anchor wraps the placeholder too. The play badge
+appears on hover, and is permanently visible under `@media (hover: none)` so
+touch users get the affordance.
+
 ---
 
 ## 9. Installable app (PWA)

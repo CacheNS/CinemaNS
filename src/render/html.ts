@@ -1,4 +1,5 @@
 import { formatDayLabel, formatDayShort, formatTimestamp } from '../core/dates.js';
+import { trailerLink } from '../core/trailer.js';
 import { CINEMAS, CINEMA_IDS } from '../core/types.js';
 import type { Movie, Showtime, Snapshot } from '../core/types.js';
 
@@ -154,9 +155,16 @@ function renderMovie(movie: Movie, date: string): string {
   const hasDubbed = showtimes.some((showtime) => showtime.audio === 'dubbed');
   const minAge = movie.ageRating?.minAge ?? -1;
 
-  const poster = movie.posterUrl
+  const trailer = trailerLink(movie);
+  const posterImage = movie.posterUrl
     ? `<img class="poster" src="${escapeHtml(movie.posterUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
     : `<div class="poster poster--empty" aria-hidden="true"></div>`;
+  // Wrapped rather than replaced, so a film with no poster is still clickable.
+  const poster = `<a class="poster-link" href="${escapeHtml(trailer.url)}"
+       target="_blank" rel="noopener noreferrer"
+       title="${trailer.exact ? 'Pogledaj trailer' : 'Potraži trailer na YouTube-u'}"
+       aria-label="${escapeHtml(`Trailer za ${movie.title}`)}"
+    >${posterImage}<span class="poster-play" aria-hidden="true"></span></a>`;
 
   const meta: string[] = [];
   if (movie.genres.length) meta.push(movie.genres.slice(0, 3).join(', '));

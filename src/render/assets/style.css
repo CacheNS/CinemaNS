@@ -173,6 +173,61 @@ main {
 
 .poster--empty { background: var(--surface-2); }
 
+/* The play badge sits over the poster, so the link needs to be the containing
+   block. Width is fixed to the poster so the anchor never stretches. */
+.poster-link {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 92px;
+  border-radius: 8px;
+}
+
+.poster-link:focus-visible {
+  outline: 2px solid var(--accent, #4f8cff);
+  outline-offset: 2px;
+}
+
+.poster-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 120ms ease-in-out;
+}
+
+.poster-play::before {
+  content: '';
+  width: 0;
+  height: 0;
+  margin-left: 4px;
+  border-style: solid;
+  border-width: 11px 0 11px 18px;
+  border-color: transparent transparent transparent #fff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+.poster-link:hover .poster-play,
+.poster-link:focus-visible .poster-play {
+  opacity: 1;
+}
+
+/* Touch screens have no hover, so the affordance is always visible there. */
+@media (hover: none) {
+  .poster-play {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poster-play { transition: none; }
+}
+
 .movie__body { flex: 1 1 auto; min-width: 0; }
 
 .movie__title {
@@ -340,4 +395,5 @@ main {
   .movie { gap: 0.7rem; padding: 0.7rem; }
   .movie__poster { flex-basis: 68px; }
   .poster { width: 68px; height: 102px; }
+  .poster-link { width: 68px; }
 }

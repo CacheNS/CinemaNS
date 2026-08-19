@@ -25,6 +25,8 @@ export interface TmdbMovie {
   imdbId?: string;
   /** Certification label per country, e.g. { US: 'PG-13', DE: '12' }. */
   certifications: Record<string, string>;
+  /** YouTube id of a Serbian-language trailer, when TMDb has one. */
+  trailerKey?: string;
 }
 
 interface SearchResponse {
@@ -59,11 +61,60 @@ interface DetailsResponse {
   alternative_titles?: {
     titles?: { iso_3166_1: string; title: string }[];
   };
+  videos?: {
+    results?: {
+      key: string;
+      site?: string;
+      type?: string;
+      official?: boolean;
+      iso_639_1?: string;
+    }[];
+  };
 }
 
-export interface TmdbLookup {  cleanTitle: string;
+export interface TmdbLookup {
+  cleanTitle: string;
   rawTitles: string[];
   year?: number;
+}
+
+/**
+ * Picks a YouTube trailer, preferring one a Serbian speaker gets most from.
+ *
+ * Order: Serbian, then the mutually intelligible neighbours, then English. An
+ * English trailer is a genuine fallback rather than a failure — it is still the
+ * right film — but it ranks below any regional upload, and a real video always
+ * beats the YouTube-search fallback the poster link uses when TMDb has nothing.
+ */
+const LANGUAGE_RANK: Record<string, number> = {
+  sr: 4,
+  sh: 3,
+  hr: 3,
+  bs: 3,
+  en: 1,
+};
+
+export function pickTrailerKey(videos: DetailsResponse['videos']): string | undefined {
+  const candidates = (videos?.results ?? []).filter(
+    (video) =>
+      video.key &&
+      (video.site ?? 'YouTube') === 'YouTube' &&
+      LANGUAGE_RANK[video.iso_639_1 ?? ''] !== undefined,
+  );
+  if (!candidates.length) return undefined;
+
+  const rank = (video: { type?: string; official?: boolean; iso_639_1?: string }): number => {
+    // Language dominates: a Serbian teaser is worth more to this audience than
+    // an official English trailer, so it is weighted above type and officiality
+    // combined.
+    let score = (LANGUAGE_RANK[video.iso_639_1 ?? ''] ?? 0) * 10;
+    if (video.type === 'Trailer') score += 4;
+    else if (video.type === 'Teaser') score += 2;
+    if (video.official) score += 1;
+    return score;
+  };
+
+  return [...candidates].sort((a, b) => rank(b) - rank(a))[0]?.key;
 }
 
 export class TmdbClient {
@@ -206,7 +257,10 @@ export class TmdbClient {
     const data = await fetchJson<DetailsResponse>(
       this.url(`/movie/${id}`, {
         language: 'sr-RS',
-        append_to_response: 'release_dates,alternative_titles',
+        append_to_response: 'release_dates,alternative_titles,videos',
+        // TMDb filters videos by language, and dropping the filter entirely
+        // returns only en-US. `null` keeps videos uploaded without a language.
+        include_video_language: 'sr,hr,bs,en,null',
       }),
     );
 
@@ -239,6 +293,8 @@ export class TmdbClient {
       movie.voteCount = data.vote_count ?? 0;
     }
     if (data.imdb_id) movie.imdbId = data.imdb_id;
+    const trailerKey = pickTrailerKey(data.videos);
+    if (trailerKey) movie.trailerKey = trailerKey;
     return movie;
   }
 }

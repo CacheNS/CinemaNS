@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { TmdbClient } from './client.js';
+import { TmdbClient, pickTrailerKey } from './client.js';
 
 /** Swap in a fetch that always answers with `status`, restoring the original. */
 async function withStubbedFetch<T>(status: number, run: () => Promise<T>): Promise<T> {
@@ -62,4 +62,51 @@ test('the client stays disabled without a key', async () => {
   const client = new TmdbClient(undefined);
   assert.equal(client.enabled, false);
   assert.equal(await client.resolve({ cleanTitle: 'Dune', rawTitles: ['Dune'] }), null);
+});
+
+test('a Serbian trailer wins over an official English one', () => {
+  const key = pickTrailerKey({
+    results: [
+      { key: 'en-official', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'en' },
+      { key: 'sr-teaser', site: 'YouTube', type: 'Teaser', official: false, iso_639_1: 'sr' },
+    ],
+  });
+  assert.equal(key, 'sr-teaser', 'language matters more to this audience than officiality');
+});
+
+test('English is used when nothing regional exists', () => {
+  const key = pickTrailerKey({
+    results: [{ key: 'en1', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'en' }],
+  });
+  assert.equal(key, 'en1');
+});
+
+test('Croatian stands in ahead of English but behind Serbian', () => {
+  const results = [
+    { key: 'en1', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'en' },
+    { key: 'hr1', site: 'YouTube', type: 'Trailer', official: false, iso_639_1: 'hr' },
+  ];
+  assert.equal(pickTrailerKey({ results }), 'hr1');
+  assert.equal(
+    pickTrailerKey({ results: [...results, { key: 'sr1', site: 'YouTube', type: 'Teaser', iso_639_1: 'sr' }] }),
+    'sr1',
+  );
+});
+
+test('non-YouTube and unknown-language videos are ignored', () => {
+  assert.equal(
+    pickTrailerKey({
+      results: [
+        { key: 'vimeo1', site: 'Vimeo', type: 'Trailer', iso_639_1: 'sr' },
+        { key: 'nolang', site: 'YouTube', type: 'Trailer' },
+      ],
+    }),
+    undefined,
+    'falling back to a YouTube search beats linking a video we cannot vouch for',
+  );
+});
+
+test('a film with no videos yields no key', () => {
+  assert.equal(pickTrailerKey(undefined), undefined);
+  assert.equal(pickTrailerKey({ results: [] }), undefined);
 });

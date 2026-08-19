@@ -100,6 +100,8 @@ export interface Movie {
   };
   kidFriendly: boolean;
   hasDubbed: boolean;
+  /** YouTube id of a regional-language trailer, when one is known. */
+  trailerKey?: string;
   /** Every raw title seen at any cinema, for debugging merges. */
   aliases: string[];
   showtimes: Showtime[];
