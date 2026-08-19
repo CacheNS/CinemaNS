@@ -67,6 +67,40 @@ test('drops dates outside the requested window', () => {
   assert.ok(showtimes.every((showtime) => showtime.date === '2026-08-19'));
 });
 
+test('ignores the placeholder row Arena leaves behind for a passed screening', () => {
+  // Real markup shape: the pane holds one genuine screening and one leftover
+  // stub whose booking link stops at /index/ with no screening id. Both read
+  // 00:00, so only the missing id tells them apart.
+  const html = `<ul class="datumar-list">
+      <li class="datumar"><a href="#t1">sre 19.08.2026.</a></li>
+    </ul>
+    <div class="tab-content">
+      <div class="tab-pane" id="t1">
+        <a href="http://www.arenacineplex.com/rezervacija/numSale/index/"><h3>00:00</h3><span>Sala:4</span></a>
+        <a href="http://www.arenacineplex.com/rezervacija/numSale/index/197750"><h3>00:00</h3><span>Sala:2</span></a>
+      </div>
+    </div>`;
+
+  const showtimes = parseArenaShowtimes(html, { url: 'http://x/film/1/Y', title: 'UKUS STRAHA' }, [
+    '2026-08-19',
+  ]);
+
+  // A genuine midnight screening must survive; only the id-less stub goes.
+  assert.equal(showtimes.length, 1);
+  assert.equal(showtimes[0]?.time, '00:00');
+  assert.equal(showtimes[0]?.hall, '2');
+});
+
+test('booking links use the ticket host over HTTPS', () => {
+  // Arena's own site has no working HTTPS, but ulaznice.arenacineplex.com does,
+  // and that is where the reader types card details.
+  const showtimes = parseArenaShowtimes(film, { url: 'http://x/film/1/Y' }, FIXTURE_DAYS);
+  const booking = showtimes.filter((showtime) => /ulaznice\.arenacineplex\.com/.test(showtime.bookingUrl));
+
+  assert.ok(booking.length > 0, 'fixture should contain real booking links');
+  assert.ok(booking.every((showtime) => showtime.bookingUrl.startsWith('https://')));
+});
+
 test('reads the original title printed next to the Serbian one', () => {
   assert.equal(parseArenaOriginalTitle(film), 'Spider-Man: Brand New Day');
   assert.equal(parseArenaOriginalTitle('<html><body><h1>X</h1></body></html>'), undefined);

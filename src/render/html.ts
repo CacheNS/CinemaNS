@@ -65,6 +65,7 @@ function renderShowtime(showtime: Showtime): string {
            rel="noopener nofollow"
            target="_blank"
            data-audio="${showtime.audio}"
+           data-time="${escapeHtml(showtime.time)}"
            title="${escapeHtml(`${cinema.name} · ${details.join(' · ')}`)}">
           <span class="showtime__time">${escapeHtml(showtime.time)}</span>
           <span class="showtime__meta">${escapeHtml(
@@ -337,6 +338,15 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
   const emptyHidden = movieCount === 0 ? '' : ' hidden';
   const emptyState = `<p class="empty" id="empty"${emptyHidden}>Za ovaj dan nema pronađenih projekcija.</p>`;
 
+  // A second empty state, because "nothing found" and "the day is over" are
+  // different facts and the second one has a useful next step. Only the client
+  // knows which applies, since it depends on the current time.
+  const tomorrow = days[days.indexOf(date) + 1];
+  const tomorrowLink = tomorrow
+    ? ` <a href="${escapeHtml(tomorrow)}.html" data-daylink>Pogledajte sutrašnji repertoar.</a>`
+    : '';
+  const pastState = `<p class="empty" id="empty-past" hidden>Sve današnje projekcije su već počele.${tomorrowLink}</p>`;
+
   return `<!DOCTYPE html>
 <html lang="sr-Latn">
 <head>
@@ -385,8 +395,9 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
 
     ${renderSourceNotices(snapshot)}
     ${emptyState}
+    ${pastState}
 
-    <div class="movies" id="movies">${cards}
+    <div class="movies" id="movies" data-date="${escapeHtml(date)}">${cards}
     </div>
   </main>
 

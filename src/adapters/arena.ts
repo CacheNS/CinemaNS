@@ -18,6 +18,15 @@ function absolute(url: string): string {
 }
 
 /**
+ * Arena's own site has no working HTTPS, but its ticket host does — and a
+ * booking link is the one place it matters, since the reader is about to hand
+ * over card details from a page we serve over HTTPS.
+ */
+function secureBookingUrl(url: string): string {
+  return url.replace(/^http:\/\/ulaznice\.arenacineplex\.com/i, 'https://ulaznice.arenacineplex.com');
+}
+
+/**
  * Arena's home page links every film in the programme, but only the six in the
  * main grid carry a title and poster. The rest are "Saznaj više" / "Rezerviši
  * online" buttons, so their titles are read from the film page itself.
@@ -171,7 +180,13 @@ export function parseArenaShowtimes(
         if (!time) return;
 
         const href = node.attr('href') ?? listing.url;
-        const hall = node
+
+        // Arena leaves a placeholder row behind for a screening that has already
+        // happened: time "00:00" and a booking link that stops at /index/ with no
+        // screening id. Every real screening carries one (…/index/197750), so the
+        // id is the signal — dropping "00:00" instead would also drop a genuine
+        // midnight show, and these rows are indistinguishable by time alone.
+        if (/\/numSale\/index\/?$/i.test(href)) return;        const hall = node
           .find('span')
           .text()
           .replace(/\s+/g, ' ')
@@ -183,7 +198,7 @@ export function parseArenaShowtimes(
           time,
           format,
           audio,
-          bookingUrl: href.startsWith('http') ? href : `${BASE}${href}`,
+          bookingUrl: secureBookingUrl(href.startsWith('http') ? href : `${BASE}${href}`),
         };
         if (hall) showtime.hall = hall;
         if (audio === 'dubbed') showtime.languageTag = 'sinhronizovano';

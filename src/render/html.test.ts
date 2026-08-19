@@ -194,6 +194,25 @@ test('escapes titles coming from the cinemas', () => {
   assert.ok(page.includes('&lt;script&gt;'));
 });
 
+test('emits what the past-showtime filter needs to work', () => {
+  const today = renderDayPage(snapshot, '2026-08-19');
+
+  // The filter runs in the browser, so the page must state its own date and
+  // each showtime's start time; without both it cannot tell "today" apart from
+  // a day the reader is browsing ahead to.
+  assert.ok(today.includes('data-date="2026-08-19"'));
+  // Every chip must carry its start time; one without would silently survive
+  // the cutoff.
+  const chips = today.match(/class="showtime /g) ?? [];
+  const times = today.match(/data-time="\d{2}:\d{2}"/g) ?? [];
+  assert.ok(chips.length > 0);
+  assert.equal(times.length, chips.length);
+
+  // The end-of-day message ships hidden and is revealed only by the script.
+  assert.match(today, /id="empty-past"[^>]*hidden/);
+  assert.ok(today.includes('data-daylink'));
+});
+
 test('warns about stale sources', () => {
   const today = renderDayPage(snapshot, '2026-08-19');
   assert.ok(today.includes('nisu ažurni'));

@@ -55,44 +55,52 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 7. **`DS` is not a dubbing marker; CineStar's `.age` is genre** (§10.6–10.7).
 8. **Parse Arena by DOM label, not body regex** — its rows run together
    (§10.8).
-9. **Europe/Belgrade for every date** (§4.6).
-10. **CSS badge modifiers go after the base `.badge` rule** (§15.4).
-11. **CineStar needs `tlsFallback`.** It sits behind a Cloudflare TLS-fingerprint
+9. **Europe/Belgrade for every date** (§4.6), and today's page hides screenings
+   that have already started — strictly, client-side, today only (§7c).
+10. **Arena's `00:00` rows with an id-less `/numSale/index/` booking link are
+    placeholders.** Drop them by the missing id, never by the time (§10.7a).
+11. **Every booking chip must reach a page that can sell that ticket** (§8.1a).
+    Cineplexx is `/purchase/wizard/<cinemaId>-<sessionId>` from the API's
+    `session.id`; **`/movie/<slug>` is a 404** and shipped dead for a while (the
+    site uses `/film/<slug>`). Arena's ticket host is forced to HTTPS. Fall back
+    to the venue programme, never to a film page that hides the venue.
+12. **CSS badge modifiers go after the base `.badge` rule** (§15.4).
+13. **CineStar needs `tlsFallback`.** It sits behind a Cloudflare TLS-fingerprint
     challenge and 403s from CI; headers and even headless Chromium do not clear
     it (§2.7a). It can pass locally and fail in CI — read the Actions log.
-12. **The trailer language order (sr → sh/hr/bs → en) is already correct.** TMDb
+14. **The trailer language order (sr → sh/hr/bs → en) is already correct.** TMDb
     held zero `sr` trailers across 33 films, so Croatian ones are a legitimate
     fallback, not a bug. Check the build's `Trejleri:` line first (§8.10).
-13. **`CF_BEACON_TOKEN` is public by design and that is not a leak** (§16.10).
+15. **`CF_BEACON_TOKEN` is public by design and that is not a leak** (§16.10).
     It ships in the HTML because the visitor's browser reports the page view.
     Keep it a repository *variable*; a secret would hide it from logs while
     leaving it just as visible on the site. Keep the beacon `type="module"`.
-14. **Serbian Latin only, never Cyrillic** (§8.12). TMDb's `sr-RS` responses are
+16. **Serbian Latin only, never Cyrillic** (§8.12). TMDb's `sr-RS` responses are
     Cyrillic and are converted at the TMDb boundary, with `escapeHtml` as a
     second net. Use `toSerbianLatin()` for display; `transliterate()` folds
     diacritics and exists only for matching. The conversion is not cosmetic —
     Cyrillic genres matched nothing in the Latin-only `ADULT_GENRES`, so the
     age heuristic was silently returning no estimate (§10.12).
-15. **`CinemaId` is a venue, not a chain** (§4.7). Beograd has five Cineplexx
+17. **`CinemaId` is a venue, not a chain** (§4.7). Beograd has five Cineplexx
     venues; a chain-level id would merge Delta City with Galerija into one
     block. Chain-level facts such as metadata trust key on `Cinema.chain`
     (§4.8).
-16. **Cineplexx venue numbers are resolved from `/api/v1/cinemas` by
+18. **Cineplexx venue numbers are resolved from `/api/v1/cinemas` by
     `cinemaUrlName`, never hardcoded** (§4.10) — the live ids are
     non-contiguous (`1114` and `1117` do not exist), so a guessed id quietly
     scrapes the wrong cinema.
-17. **Every city but the default renders pre-hidden, and JS only reveals**
+19. **Every city but the default renders pre-hidden, and JS only reveals**
     (§7b.4). This is the one place a no-JS superset is *wrong* rather than
     merely broad: a Novi Sad reader must never see Belgrade showtimes. Counts,
     empty state, subtitle and stale-source notices are all per city (§7b.5).
-18. **Arena exists only in Novi Sad** (§1.2.1) — its site has no location
+20. **Arena exists only in Novi Sad** (§1.2.1) — its site has no location
     selector at all. Do not try to parameterize it by city.
 
 ## Before committing
 
 ```
 npx tsc --noEmit
-npm test          # 104 tests, fixtures only, no network
+npm test          # 110 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```
@@ -121,6 +129,11 @@ parser was broken against the live page (§12.3).
   bookmarks, orphan installed PWA copies and reset the analytics history — for a
   URL that still would not be `kokice.org`. The rename waits for the domain move
   and happens once.
+- **Cross-venue inconsistency about past screenings is fixed on our side**
+  (§7c), because it is upstream policy: measured at 23:17, Cineplexx had pruned
+  to the next screening, CineStar still listed 16:00, and Arena had dropped the
+  day. Today's page hides anything already started, strictly and client-side, so
+  a late-evening page going empty is the correct answer, not a bug.
 - **Both cities share one page on purpose** (§7b.2). The payload objection was
   measured, not assumed: measured on production, a full day page carrying both
   cities is 157 KB raw but **10.0 KB over the wire** (15.7× gzip, and GitHub

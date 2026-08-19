@@ -24,6 +24,10 @@ keeps its old name on purpose until the domain move (R-13.8).
 - **Dubbing is a property of the showtime, not the film.** The same film runs
   dubbed in the afternoon and subtitled in the evening, so the dubbed filter
   hides individual chips and only then empties cards.
+- **Today's page hides screenings that have already started**, strictly and in
+  the browser (Belgrade time, today only). The chains disagree about how much of
+  the past they publish, so this consistency is our rule, not theirs — and late
+  in the evening today's page legitimately goes empty.
 - **`CinemaId` is a venue, not a chain.** Beograd has five Cineplexx venues;
   collapsing them would show Delta City and Galerija as one building. Chain-level
   facts such as metadata trust live on `Cinema.chain`.
@@ -48,6 +52,12 @@ These look like trivia, but each one was a real bug. See §10 of
 - Arena's detail rows run together (`RSGodina proizvodnje`), so parse by reading
   the `<strong>` label's own container, not with a regex over the body text.
 - `DS` in an Arena title is **not** a dubbing marker.
+- **Booking chips must reach a page that can sell that ticket.** Cineplexx's is
+  `/purchase/wizard/<cinemaId>-<sessionId>`; `/movie/<slug>` is a 404 (the site
+  uses `/film/<slug>`). Arena's ticket host is forced to HTTPS.
+- Arena's `00:00` rows whose booking link stops at `/numSale/index/` with no
+  screening id are leftover placeholders. Drop them by the **missing id**, never
+  by the time — a genuine midnight screening looks identical otherwise.
 - CineStar's `.age` field contains **genre**, not an age rating.
 - Domestic Serbian films are `audio: 'original'` ("domaći film"), never
   "titlovano" — and the remap happens at merge level so all cinemas agree.
@@ -83,7 +93,7 @@ These look like trivia, but each one was a real bug. See §10 of
 
 ## Working in this repo
 
-- `npm test` (104 tests, no network — fixtures only) and `npx tsc --noEmit` must
+- `npm test` (110 tests, no network — fixtures only) and `npx tsc --noEmit` must
   both pass before committing.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.

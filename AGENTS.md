@@ -19,7 +19,7 @@ its old name deliberately (R-13.8).
 ## Commands
 
 ```
-npm test          # 104 tests, fixtures only, no network
+npm test          # 110 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -41,6 +41,10 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   facts (metadata trust) live on `Cinema.chain`.
 - City is a property of the **cinema block**, so switching city reuses the same
   `apply()` loop as the filters.
+- **Today's page hides screenings that have already started**, strictly and in
+  the browser — the chains disagree about how much of the past they publish, so
+  consistency is our rule, not theirs. Belgrade time, today only, so late in the
+  evening the page legitimately goes empty.
 - Every city but the default renders pre-hidden and JS only ever *reveals*. A
   no-JS reader must get a correct single-city page, never a mix.
 - All dates are Europe/Belgrade.
@@ -55,6 +59,12 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
 - Parse Arena's detail rows via the `<strong>` label's own container — the rows
   run together (`RSGodina proizvodnje`), so a body-text regex fails.
 - `DS` in an Arena title is not a dubbing marker.
+- **Booking chips must reach a page that can sell that ticket** (§8.1a).
+  Cineplexx's is `/purchase/wizard/<cinemaId>-<sessionId>` — `/movie/<slug>` is
+  a 404, the site uses `/film/<slug>`. Arena's ticket host is forced to HTTPS.
+- Arena's `00:00` rows whose booking link stops at `/numSale/index/` with no
+  screening id are leftover placeholders. Drop them by the **missing id**, never
+  by the time — a genuine midnight screening looks identical otherwise.
 - CineStar's `.age` field holds genre, not an age rating.
 - Domestic Serbian films are `audio: 'original'` ("domaći film"), remapped at
   merge level so all cinemas agree. Only Arena publishes the country and Arena

@@ -71,6 +71,23 @@ function toLocalParts(isoWithOffset: string): { date: string; time: string } | n
 }
 
 /**
+ * Deep-links to the ticket wizard for one screening.
+ *
+ * The site's own showtime buttons point at
+ * `/purchase/wizard/<cinemaId>-<sessionId>`, which is exactly the API's session
+ * id, and that URL opens the purchase flow for that single screening. The film
+ * page is not a substitute: it does not say which venue the reader picked, and
+ * `/movie/<slug>` is in fact a **404** — the site serves film pages from
+ * `/film/<slug>`. That wrong path shipped for a while and made every Cineplexx
+ * chip on the page a dead link.
+ */
+export function cineplexxBookingUrl(sessionId: string | undefined, urlName: string): string {
+  return sessionId
+    ? `${SITE_BASE}/purchase/wizard/${sessionId}`
+    : `${SITE_BASE}/cinemas/${urlName}?date=all`;
+}
+
+/**
  * Scrapes one Cineplexx venue.
  *
  * The numeric cinema id is always resolved from `/cinemas` by `cinemaUrlName`
@@ -144,9 +161,7 @@ export async function scrapeCineplexx(
       format: detectFormat(formats.join(' ')),
       audio,
       hall: session.screenName,
-      bookingUrl: movie?.shortURL
-        ? `${SITE_BASE}/movie/${movie.shortURL}`
-        : `${SITE_BASE}/cinemas/${urlName}?date=all`,
+      bookingUrl: cineplexxBookingUrl(session.id, urlName),
     };
     if (flags.length) showtime.languageTag = 'sinhronizovano';
 
@@ -173,7 +188,7 @@ export async function scrapeCineplexx(
         const year = Number(movie.startDate.slice(0, 4));
         if (Number.isFinite(year)) entry.year = year;
       }
-      if (movie?.shortURL) entry.detailUrl = `${SITE_BASE}/movie/${movie.shortURL}`;
+      if (movie?.shortURL) entry.detailUrl = `${SITE_BASE}/film/${movie.shortURL}`;
       byMovie.set(session.movieId, entry);
     }
     entry.showtimes.push(showtime);

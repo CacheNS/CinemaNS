@@ -331,10 +331,79 @@ deep-link into the combined page — not to abandon the combined page.
 
 ---
 
+## 7c. Past showtimes
+
+**R-7c.1 Today's page hides screenings that have already started**, so all
+venues read consistently. This is our rule, not the sites' — measured at 23:17
+Belgrade, Cineplexx had pruned to the next screening, CineStar was still listing
+16:00, and Arena had dropped the day entirely. The inconsistency is upstream
+policy, so it cannot be fixed in an adapter.
+
+**R-7c.2 A strict cutoff, no grace period.** A screening is hidden the minute
+it starts. The page answers "what can I still go to", so a listing you can no
+longer buy a ticket for is noise.
+
+**R-7c.3 Today only.** Past days are left intact, so a shared or cached link to
+an earlier day still reads as a record of that day rather than an empty page.
+The page states its own date (`data-date` on `#movies`) and the client compares
+it with the current Belgrade date; they differ, no filtering happens.
+
+**R-7c.4 Client-side, not build-time.** Builds run hourly and the service worker
+caches HTML, so a build-time cutoff would bake in a timestamp and leave up to an
+hour of started screenings on a fresh page — and far more on a cached one.
+Filtering in the browser is correct to the minute even on a stale page.
+
+**R-7c.5 Europe/Belgrade, never the visitor's zone** (R-2.6). A reader in London
+at 21:00 must still see Belgrade's 22:00. If `Intl` has no time-zone support the
+filter disables itself: showing a screening that has passed is a smaller failure
+than hiding one that has not.
+
+**R-7c.6 It reuses the existing chip → cinema → card cascade** (R-7.3) rather
+than adding a second mechanism, and past chips are excluded from the
+unknown-audio count (R-7.8) so the notice describes only what the reader could
+otherwise have seen.
+
+**R-7c.7 When the whole day has aged out**, the page says so and links to
+tomorrow, rather than showing the generic "nothing found" message. That message
+is only used when the time filter is genuinely the cause — if the reader's own
+dubbed/kids filters emptied the page, the generic message still applies. Late in
+the evening today's page legitimately goes empty; that is the correct answer,
+not a bug.
+
+**R-7c.8 A page left open re-filters itself.** The cutoff is re-evaluated every
+minute and `apply()` runs only when it actually moves.
+
+**R-7c.9 No-JS shows the superset** (R-7.7). Unlike the city filter (R-7b.4),
+an unfiltered superset here is merely broader, not wrong, so nothing is
+pre-hidden.
+
+---
+
 ## 8. UI requirements
 
 **R-8.1** Movie cards grouped by film, each with poster, title, badges and
 per-cinema showtime chips linking to that cinema's booking page.
+
+**R-8.1a Every chip must reach a page that can actually sell that ticket** — the
+specific screening where the site allows it, and never a dead URL. Verified
+against the live sites:
+
+- **Arena** → `ulaznice.arenacineplex.com/rs/site/numSale/index/<id>`, which
+  redirects into seat selection for that screening. Forced to **HTTPS**: the
+  main Arena site has no working TLS but the ticket host does, and that is where
+  card details are typed.
+- **Cineplexx** → `/purchase/wizard/<cinemaId>-<sessionId>`, taken from the
+  API's `session.id`, which opens the ticket wizard for that one screening.
+  **`/movie/<slug>` is a 404** — the site serves film pages from `/film/<slug>`
+  — so the earlier film-page link was dead on every Cineplexx chip, and it could
+  not have named the venue anyway.
+- **CineStar** → `/Shop/<venue>/<slug>/<sessionKey>`. CineStar drops the
+  purchase key from screenings that have already started, and those fall back to
+  the venue programme; R-7c then hides them, so the fallback is not normally
+  reachable.
+
+**R-8.1b** A missing deep link degrades to the **venue's own programme page**,
+never to a film page that does not identify the cinema.
 
 **R-8.2 Original title in brackets** next to the Serbian title, e.g.
 *Spajdermen: Novi dan (Spider-Man: Brand New Day)*. Absent only for domestic
@@ -488,6 +557,14 @@ both a dubbed cartoon and a domestic Serbian film. Do not infer audio from it.
 **R-10.7** CineStar's `.age` field contains **genre**, not age. Do not use it
 for age ratings.
 
+**R-10.7a Arena leaves a placeholder row behind for a screening that has already
+happened.** It reads `00:00` and its booking link stops at
+`/rezervacija/numSale/index/` with **no screening id**, while every real
+screening carries one (`…/index/197750`). Live-verified: 138 rows had an id, the
+3 without one were all `00:00`. **Discard by the missing id, never by the time** —
+dropping `00:00` would also drop a genuine midnight screening, and it would leave
+a booking chip pointing at a page that cannot sell a ticket (R-8.1).
+
 **R-10.8** Arena's detail rows have no whitespace between them, so the value
 runs into the next label (`RSGodina proizvodnje`). Parse by reading the
 `<strong>` label's own container — a `\b`-anchored regex on the flattened body
@@ -557,7 +634,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **104 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **110 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same

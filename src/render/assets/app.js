@@ -16,7 +16,54 @@
   var dubbedInput = document.getElementById('filter-dubbed');
   var kidsInput = document.getElementById('filter-kids');
   var empty = document.getElementById('empty');
+  var emptyPast = document.getElementById('empty-past');
   var cityNav = document.getElementById('cities');
+  var pageDate = container.getAttribute('data-date');
+
+  /**
+   * "Now" in Europe/Belgrade, never the visitor's own zone: someone opening the
+   * page from London at 21:00 must still see Belgrade's evening. sv-SE gives an
+   * ISO-shaped "2026-08-19 23:17".
+   */
+  function belgradeNow() {
+    try {
+      var text = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Belgrade',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date());
+      var date = text.slice(0, 10);
+      var time = text.slice(11, 16);
+      // Some engines render midnight as 24:00 rather than 00:00.
+      if (time.indexOf('24:') === 0) time = '00:' + time.slice(3);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
+      return { date: date, time: time };
+    } catch (err) {
+      // No Intl time zone support: show everything rather than risk hiding a
+      // screening that has not started.
+      return null;
+    }
+  }
+
+  /** "21:45" → minutes since midnight, or -1 when unparseable. */
+  function toMinutes(text) {
+    if (!text || !/^\d{2}:\d{2}$/.test(text)) return -1;
+    return Number(text.slice(0, 2)) * 60 + Number(text.slice(3, 5));
+  }
+
+  /** Cutoff in minutes since midnight, or null when nothing should be hidden. */
+  function pastCutoff() {
+    if (!pageDate) return null;
+    var now = belgradeNow();
+    // Only the current day prunes. A past day is left intact so a stale or
+    // shared link still reads as a record of that day rather than an empty page.
+    if (!now || now.date !== pageDate) return null;
+    return toMinutes(now.time);
+  }
 
   // The city tabs are the registry: each carries its id and its slug, so the
   // client never needs a hardcoded copy of the city list.
@@ -86,6 +133,8 @@
     var visibleMovies = 0;
     var visibleShowtimes = 0;
     var unknownAudio = 0;
+    var cutoff = pastCutoff();
+    var hidPast = false;
 
     applyCityChrome();
 
@@ -112,9 +161,15 @@
         var showtimes = cinema.querySelectorAll('.showtime');
         for (var k = 0; k < showtimes.length; k++) {
           var showtime = showtimes[k];
-          var unknown = showtime.getAttribute('data-audio') === 'unknown';
+          // The chains disagree about how much of the past they publish -
+          // Cineplexx prunes, CineStar keeps hours of started screenings - so
+          // the cutoff is applied here rather than trusted from the source.
+          var start = toMinutes(showtime.getAttribute('data-time'));
+          var past = cutoff !== null && start >= 0 && start < cutoff;
+          if (past) hidPast = true;
+          var unknown = !past && showtime.getAttribute('data-audio') === 'unknown';
           if (unknown) unknownAudio++;
-          var hide = dubbedOnly && showtime.getAttribute('data-audio') !== 'dubbed';
+          var hide = past || (dubbedOnly && showtime.getAttribute('data-audio') !== 'dubbed');
           showtime.hidden = hide;
           if (!hide) shownInCinema++;
         }
@@ -138,7 +193,13 @@
         ' naznačen jezik i nisu prikazane';
     }
     counts.textContent = text;
-    if (empty) empty.hidden = visibleMovies > 0;
+
+    // "Nothing found" and "the day is over" are different facts. The second is
+    // only claimed when the time filter is genuinely the reason, so it is not
+    // shown when the user's own filters emptied the page.
+    var dayIsOver = visibleMovies === 0 && hidPast && !dubbedOnly && !kidsOnly;
+    if (empty) empty.hidden = visibleMovies > 0 || dayIsOver;
+    if (emptyPast) emptyPast.hidden = !dayIsOver;
 
     syncUrl(dubbedOnly, kidsOnly);
   }
@@ -160,8 +221,9 @@
     var url = window.location.pathname + (query ? '?' + query : '');
     window.history.replaceState(null, '', url);
 
-    // Keep city and filter state when switching days.
-    var tabs = document.querySelectorAll('.daytab');
+    // Keep city and filter state when switching days. The end-of-day message
+    // links to tomorrow too, so it is kept in step.
+    var tabs = document.querySelectorAll('.daytab, [data-daylink]');
     for (var i = 0; i < tabs.length; i++) {
       var href = tabs[i].getAttribute('href').split('?')[0];
       tabs[i].setAttribute('href', query ? href + '?' + query : href);
@@ -182,6 +244,18 @@
 
   form.addEventListener('change', apply);
   apply();
+
+  // A page left open should not keep advertising a screening that has aged out,
+  // and it must survive midnight. Re-filter when the cutoff actually moves,
+  // rather than on a blind interval.
+  var lastCutoff = pastCutoff();
+  window.setInterval(function () {
+    var next = pastCutoff();
+    if (next !== lastCutoff) {
+      lastCutoff = next;
+      apply();
+    }
+  }, 60000);
 
   // Installability: Chrome/Android fires beforeinstallprompt and we can install
   // in one tap. Everywhere else - notably iOS Safari, which has no such event -
