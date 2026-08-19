@@ -59,6 +59,53 @@ export function transliterate(input: string): string {
 }
 
 /**
+ * Serbian Cyrillic → Serbian Latin for text shown to people.
+ *
+ * Distinct from {@link transliterate}, which deliberately folds diacritics
+ * because it feeds title matching. This one keeps them, so the result is real
+ * Serbian Latin ("Naučna fantastika") rather than an asciified approximation
+ * ("Naucna fantastika").
+ *
+ * The mapping is 1:1 in this direction, which is why it is safe to apply
+ * automatically — Latin → Cyrillic is not, since "nj" may be one letter or two.
+ */
+const CYRILLIC_TO_LATIN_DISPLAY: Record<string, string> = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', ђ: 'đ', е: 'e', ж: 'ž', з: 'z',
+  и: 'i', ј: 'j', к: 'k', л: 'l', љ: 'lj', м: 'm', н: 'n', њ: 'nj', о: 'o',
+  п: 'p', р: 'r', с: 's', т: 't', ћ: 'ć', у: 'u', ф: 'f', х: 'h', ц: 'c',
+  ч: 'č', џ: 'dž', ш: 'š',
+};
+
+export function toSerbianLatin(input: string): string {
+  const chars = [...input];
+  let out = '';
+
+  for (let i = 0; i < chars.length; i++) {
+    const char = chars[i] as string;
+    const lower = char.toLowerCase();
+    const mapped = CYRILLIC_TO_LATIN_DISPLAY[lower];
+
+    if (mapped === undefined) {
+      out += char;
+      continue;
+    }
+    if (char === lower) {
+      out += mapped;
+      continue;
+    }
+
+    // A digraph in an all-caps run must stay all-caps: "ЉУБАВ" is "LJUBAV",
+    // not "LjUBAV". Judge by the neighbour, since the digraph's own case
+    // cannot distinguish "Njegoš" from "NJEGOŠ".
+    const next = chars[i + 1];
+    const nextIsUpper = next !== undefined && next !== next.toLowerCase();
+    out += nextIsUpper ? mapped.toUpperCase() : mapped.charAt(0).toUpperCase() + mapped.slice(1);
+  }
+
+  return out;
+}
+
+/**
  * Same noise stripping as {@link cleanTitle}, but it keeps hyphens and other
  * punctuation the title genuinely uses ("Spider-Man: Brand New Day"). Used for
  * titles shown to people rather than fed to search.

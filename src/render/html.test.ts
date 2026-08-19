@@ -161,3 +161,28 @@ test('is installable as an app', () => {  const today = renderDayPage(snapshot, 
   assert.ok(today.includes('Dodaj na početni ekran'));
   assert.ok(today.includes('apple-touch-icon'));
 });
+
+test('no Cyrillic reaches the rendered page', () => {
+  // The site is Latin-only. escapeHtml is the single choke point every string
+  // passes through, so converting there makes this structural rather than a
+  // rule each call site must remember.
+  const cyrillic: Snapshot = {
+    ...snapshot,
+    movies: [
+      {
+        ...snapshot.movies[0]!,
+        title: 'Спајдермен: Нови дан',
+        genres: ['Научна фантастика', 'Хорор'],
+        aliases: ['Спајдермен'],
+      },
+    ],
+  };
+  const html = renderDayPage(cyrillic, '2026-08-19');
+  assert.doesNotMatch(html, /[\u0400-\u04FF]/, 'page must contain no Cyrillic');
+  assert.match(html, /Spajdermen: Novi dan/);
+  assert.match(html, /Naučna fantastika/);
+});
+
+test('escapeHtml converts Cyrillic while still escaping markup', () => {
+  assert.equal(escapeHtml('Хорор & <b>'), 'Horor &amp; &lt;b&gt;');
+});

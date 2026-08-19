@@ -42,6 +42,12 @@ These look like trivia, but each one was a real bug. See §10 of
 - CineStar's `.age` field contains **genre**, not an age rating.
 - Domestic Serbian films are `audio: 'original'` ("domaći film"), never
   "titlovano" — and the remap happens at merge level so all cinemas agree.
+- **The page is Serbian Latin, never Cyrillic.** TMDb's `sr-RS` responses are
+  Cyrillic, converted at the TMDb boundary and again inside `escapeHtml`. Use
+  `toSerbianLatin()` (keeps diacritics) for display, never `transliterate()`
+  (folds them, for matching only). This was not cosmetic: Cyrillic `Хорор` and
+  `Трилер` matched nothing in the Latin-only `ADULT_GENRES`, so the age
+  heuristic silently produced no estimate at all.
 - CineStar is behind a Cloudflare TLS-fingerprint challenge and 403s from CI, so
   it alone uses `tlsFallback: true` (retry via `curl_cffi`); headers and even
   headless Chromium do not help (R-2.7a). A scraper can fail in CI while passing
@@ -65,7 +71,7 @@ These look like trivia, but each one was a real bug. See §10 of
 
 ## Working in this repo
 
-- `npm test` (83 tests, no network — fixtures only) and `npx tsc --noEmit` must
+- `npm test` (91 tests, no network — fixtures only) and `npx tsc --noEmit` must
   both pass before committing.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.

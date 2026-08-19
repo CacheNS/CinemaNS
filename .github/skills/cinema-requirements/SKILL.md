@@ -63,12 +63,18 @@ merges by movie, and emits one Serbian HTML page per day plus `data.json`.
     It ships in the HTML because the visitor's browser reports the page view.
     Keep it a repository *variable*; a secret would hide it from logs while
     leaving it just as visible on the site. Keep the beacon `type="module"`.
+14. **Serbian Latin only, never Cyrillic** (§8.12). TMDb's `sr-RS` responses are
+    Cyrillic and are converted at the TMDb boundary, with `escapeHtml` as a
+    second net. Use `toSerbianLatin()` for display; `transliterate()` folds
+    diacritics and exists only for matching. The conversion is not cosmetic —
+    Cyrillic genres matched nothing in the Latin-only `ADULT_GENRES`, so the
+    age heuristic was silently returning no estimate (§10.12).
 
 ## Before committing
 
 ```
 npx tsc --noEmit
-npm test          # 83 tests, fixtures only, no network
+npm test          # 91 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```

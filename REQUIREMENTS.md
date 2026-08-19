@@ -294,6 +294,23 @@ new tab (`target="_blank" rel="noopener noreferrer"`). The link is built by
   id. The tooltip is worded accordingly ("Pogledaj trailer" vs "Potraži trailer
   na YouTube-u"), so the link never overstates what it knows.
 
+**R-8.12 The page is Serbian Latin only — never Cyrillic.** TMDb returns
+`sr-RS` text in Cyrillic (titles, genres, overviews), so it is converted at the
+TMDb boundary in `tmdb/client.ts`, and `escapeHtml` converts again as a safety
+net. `escapeHtml` is the single choke point every rendered string passes
+through, which makes the guarantee structural instead of a rule each call site
+has to remember; the conversion is a no-op on Latin input.
+
+Use `toSerbianLatin()` for anything shown to a person — it keeps diacritics
+("Naučna fantastika"). Do **not** use `transliterate()`, which deliberately
+folds them for title matching and would yield "Naucna fantastika". The
+Cyrillic → Latin direction is 1:1 and therefore safe to automate; the reverse is
+not, since "nj" may be one letter or two.
+
+`original_title` is deliberately **not** converted: it is the film's own
+original-language title, and forcing a Serbian mapping onto, say, Russian would
+corrupt it.
+
 **R-8.11** The trailer link must work without a TMDb key, and must exist even
 for a film with no poster — the anchor wraps the placeholder too. The play badge
 appears on hover, and is permanently visible under `@media (hover: none)` so
@@ -377,6 +394,17 @@ clock — confirmed correct.
 
 **R-10.11** Cineplexx's `runTime` is the exact runtime and is preferred.
 
+**R-10.12 Cyrillic genres silently broke the age heuristic.** `KID_GENRES` and
+`ADULT_GENRES` in `ratings.ts` are written in Latin, so TMDb's Cyrillic
+`Хорор` / `Трилер` / `Цртани` matched **nothing**. Horror and thriller films
+therefore received no heuristic age estimate at all, and the page looked
+correct while quietly giving out less information than it should have.
+
+This is the reason the Latin conversion happens at the TMDb boundary rather
+than in the renderer: converting once, at the point the Cyrillic enters the
+system, fixes the display, the age heuristic and title matching together.
+Converting only at render time would have left the heuristic broken.
+
 ---
 
 ## 11. Failure handling
@@ -422,7 +450,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **83 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **91 tests passing**, `tsc --noEmit` clean.
 
 ---
 

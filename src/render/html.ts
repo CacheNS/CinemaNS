@@ -1,11 +1,21 @@
 import { formatDayLabel, formatDayShort, formatTimestamp } from '../core/dates.js';
 import { analyticsSnippet } from './analytics.js';
 import { trailerLink } from '../core/trailer.js';
+import { toSerbianLatin } from '../core/titles.js';
 import { CINEMAS, CINEMA_IDS } from '../core/types.js';
 import type { Movie, Showtime, Snapshot } from '../core/types.js';
 
+/**
+ * Escapes for HTML, and converts any Serbian Cyrillic to Latin on the way out.
+ *
+ * The site is Latin-only, and this is the single choke point every piece of
+ * text passes through, so enforcing it here makes the guarantee structural
+ * rather than a rule each call site has to remember. TMDb is already converted
+ * at its own boundary (see `tmdb/client.ts`); this catches anything a cinema
+ * or a future source might introduce. It is a no-op on Latin input.
+ */
 export function escapeHtml(value: string): string {
-  return value
+  return toSerbianLatin(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

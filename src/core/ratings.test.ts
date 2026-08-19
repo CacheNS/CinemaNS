@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { formatAgeLabel, heuristicRating, isKidFriendly, resolveAgeRating } from './ratings.js';
+import { toSerbianLatin } from './titles.js';
 import type { TmdbMovie } from '../tmdb/client.js';
 
 function movie(certifications: Record<string, string>, extra: Partial<TmdbMovie> = {}): TmdbMovie {
@@ -58,4 +59,19 @@ test('kid-friendly cutoff and labels', () => {
   assert.equal(isKidFriendly({ label: '15+', minAge: 15, source: 'HR', confident: true }), false);
   // No rating at all must not count as kid friendly.
   assert.equal(isKidFriendly(undefined), false);
+});
+
+test('Cyrillic genres from TMDb still drive the heuristic', () => {
+  // Regression: TMDb returns sr-RS genres in Cyrillic ("Хорор"), while the
+  // keyword lists are Latin. Before transliteration at the TMDb boundary the
+  // heuristic silently matched nothing, so horror films got no age badge at
+  // all. Genres reaching this function must already be Latin.
+  assert.equal(heuristicRating([toSerbianLatin('Хорор')], false)?.minAge, 16);
+  assert.equal(heuristicRating([toSerbianLatin('Трилер')], false)?.minAge, 16);
+  assert.equal(heuristicRating([toSerbianLatin('Цртани')], true)?.minAge, 0);
+  assert.equal(heuristicRating([toSerbianLatin('Породични')], false)?.minAge, 6);
+});
+
+test('raw Cyrillic genres match nothing, which is why the boundary conversion matters', () => {
+  assert.equal(heuristicRating(['Хорор'], false), undefined);
 });

@@ -1,5 +1,5 @@
 import { fetchJson, HttpError } from '../core/http.js';
-import { normalizeTitle, similarity } from '../core/titles.js';
+import { normalizeTitle, similarity, toSerbianLatin } from '../core/titles.js';
 
 const API_BASE = 'https://api.themoviedb.org/3';
 const IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
@@ -297,16 +297,22 @@ export class TmdbClient {
       if (certification) certifications[entry.iso_3166_1] = certification;
     }
 
+    // TMDb returns sr-RS localised text in Cyrillic. Convert at the boundary so
+    // everything downstream sees Latin: not only the rendered page, but also the
+    // genre keywords the age heuristic matches on, which are Latin-only and were
+    // therefore never matching TMDb's genres.
     const movie: TmdbMovie = {
       id: data.id,
-      title: data.title ?? '',
-      originalTitle: data.original_title ?? data.title ?? '',
-      genres: (data.genres ?? []).map((genre) => genre.name),
+      title: toSerbianLatin(data.title ?? ''),
+      // Not transliterated: this is the film's own original-language title, and
+      // forcing a Serbian mapping onto, say, Russian would be wrong.
+      originalTitle: data.original_title ?? toSerbianLatin(data.title ?? ''),
+      genres: (data.genres ?? []).map((genre) => toSerbianLatin(genre.name)),
       adult: Boolean(data.adult),
       certifications,
     };
     if (data.poster_path) movie.posterUrl = `${IMAGE_BASE}${data.poster_path}`;
-    if (data.overview) movie.overview = data.overview;
+    if (data.overview) movie.overview = toSerbianLatin(data.overview);
     if (data.runtime) movie.runtimeMinutes = data.runtime;
     if (data.release_date) {
       const year = Number(data.release_date.slice(0, 4));
