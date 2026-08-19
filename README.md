@@ -1,5 +1,8 @@
 # Bioskopi u Novom Sadu
 
+> **Menjaš nešto u ovom repozitorijumu?** Prvo pročitaj
+> [`REQUIREMENTS.md`](REQUIREMENTS.md) — to je osnovna specifikacija projekta.
+
 Objedinjen repertoar tri novosadska bioskopa na jednoj brzoj stranici:
 
 | Bioskop | Izvor |
