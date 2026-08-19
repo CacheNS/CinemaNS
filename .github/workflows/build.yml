@@ -32,6 +32,15 @@ jobs:
 
       - run: npm ci
 
+      # CineStar is behind a Cloudflare managed challenge that fingerprints the
+      # TLS handshake, so Node's fetch is refused from the runner no matter what
+      # headers it sends. curl_cffi replays a real Chrome handshake and is the
+      # only method measured to get through. The build degrades to CineStar's
+      # last good data if this step ever fails, so it must not be fatal.
+      - name: Install curl_cffi (CineStar TLS fallback)
+        continue-on-error: true
+        run: pip install --quiet curl_cffi
+
       - run: npm test
 
       - run: npm run build

@@ -53,16 +53,34 @@ must not pretend otherwise.
 **R-2.7 Politeness.** One refresh per hour, sequential per host, small delay,
 descriptive User-Agent. Arena requires N+1 requests (one page per film).
 
-**R-2.7a CineStar is the exception to R-2.7's descriptive User-Agent.**
-`cinestarcinemas.rs` sits behind Cloudflare, which returns **HTTP 403 to
-datacenter IPs** — the site scrapes fine from a home connection with any
-User-Agent, including none, but fails from GitHub Actions runners. Evidence: a
-CI run logged `[cinestar] neuspeh: HTTP 403`, while the identical request from a
-local machine returned 200; the response carries `Server: cloudflare`. CineStar
-is therefore fetched with `browserLike: true`, which sends a full browser header
-set (`Sec-Fetch-*`, `sec-ch-ua`, `Upgrade-Insecure-Requests`, browser UA).
-Arena and Cineplexx keep the honest `CinemaNS` User-Agent. Do not switch other
-adapters to `browserLike` without the same evidence of a block.
+**R-2.7a CineStar needs a browser TLS fingerprint, not just browser headers.**
+`cinestarcinemas.rs` sits behind a Cloudflare **managed challenge** that
+fingerprints the TLS handshake. It scrapes fine from a home connection with any
+User-Agent, including none, but returns **HTTP 403 with a "Just a moment…"
+body** from a GitHub Actions runner. Measured on the runner (`52.234.41.68`):
+
+| Method | Result |
+|---|---|
+| Node `fetch`, plain | 403 challenge |
+| `curl` with full browser headers | 403 challenge |
+| Same, forced HTTP/1.1 | 403 challenge |
+| `www.` hostname | 403 challenge |
+| **Headless Chromium (Playwright)** | **403 challenge** |
+| `robots.txt` (any client) | 200 — the rule is path-scoped |
+| **`curl_cffi`, `impersonate="chrome"`** | **200, full 265 KB page** |
+
+Headers cannot fix this, and neither can a real headless browser. CineStar is
+therefore fetched with `tlsFallback: true`: an ordinary Node fetch first, and on
+403 only, a retry through `curl_cffi`, which replays a Chrome handshake. Arena
+and Cineplexx keep the honest `CinemaNS` User-Agent. Do not enable `tlsFallback`
+elsewhere without the same evidence.
+
+**R-2.7a-i The fallback is optional, never required.** It shells out to Python +
+`curl_cffi`, installed by a `continue-on-error` CI step. When absent,
+`fetchText` re-throws the original 403, so the failure reads as "CineStar
+refused us" rather than "Python is missing", and the build degrades to
+CineStar's last good data (R-11.2). `CINEMANS_DISABLE_IMPERSONATE=1` forces it
+off, which is how the tests stay offline.
 
 **R-2.7b A 403 is retryable.** Unlike other 4xx codes, a 403 from bot
 protection is a scoring decision about the caller rather than a statement about
@@ -414,11 +432,10 @@ the hourly refresh (R-2.1). To move the project between accounts, use
 
 ## 14. Open items
 
-**R-14.1 OPEN — no TMDb API key is configured.** The build currently reports
-`TMDb 0/61`. Until a key is supplied there are **no age ratings, no scores, and
-weaker cross-language matching**, and "Za decu" is genre guesswork. Everything
-degrades gracefully, but §6 is effectively inactive. This is the single highest
--value outstanding item. See R-13.4a for which key type to use.
+**R-14.1 TMDb API key — configured.** A `TMDB_API_KEY` repository secret is set,
+so §6 age ratings, scores and TMDb-id-based cross-language matching are active
+in CI. Local builds still need the key in `.env` or they run in the degraded
+title-matching mode. See R-13.4a for which key type to use.
 
 **R-14.2 OPEN — Arena-only films** can still show a director as the original
 title, because there is no second source to outrank Arena. Accepted; no reliable

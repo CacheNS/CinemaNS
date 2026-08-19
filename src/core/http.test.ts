@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { fetchText } from './http.js';
+import { resetInterpreterCache } from './impersonate.js';
 
 interface Call {
   url: string;
@@ -72,4 +73,35 @@ test('other hosts keep the honest, identifiable User-Agent', async () => {
   const ua = stub.calls[0]!.headers['User-Agent']!;
   assert.match(ua, /CinemaNS/);
   assert.doesNotMatch(ua, /Mozilla/);
+});
+
+test('a 403 without tlsFallback still surfaces as an HTTP error', async () => {
+  const stub = stubFetch([403]);
+  try {
+    await assert.rejects(() => fetchText('https://cinestarcinemas.rs/novi-sad-big'), /HTTP 403/);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('tlsFallback reports the original 403 when the impersonator is unavailable', async () => {
+  // A missing interpreter must not mask the real diagnosis, which is that the
+  // host returned 403. Forced off so the test never depends on what happens to
+  // be installed, and never reaches the network.
+  process.env['CINEMANS_DISABLE_IMPERSONATE'] = '1';
+  resetInterpreterCache();
+  const stub = stubFetch([403]);
+  try {
+    await assert.rejects(
+      () => fetchText('https://cinestarcinemas.rs/novi-sad-big', { tlsFallback: true }),
+      (error: Error) => {
+        assert.match(error.message, /HTTP 403/);
+        assert.doesNotMatch(error.message, /curl_cffi nije dostupan/);
+        return true;
+      },
+    );
+  } finally {
+    stub.restore();
+    resetInterpreterCache();
+  }
 });

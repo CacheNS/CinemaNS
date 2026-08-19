@@ -1,5 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { ImpersonateUnavailableError, fetchTextImpersonated } from './impersonate.js';
+
 const DEFAULT_TIMEOUT_MS = Number(process.env['REQUEST_TIMEOUT_MS'] ?? 20_000);
 const USER_AGENT =
   process.env['USER_AGENT'] ??
@@ -34,11 +36,13 @@ async function politeGate(host: string): Promise<void> {
 }
 
 /**
- * Cloudflare scores requests partly on whether they look like a real browser
- * navigation, and it is stricter about datacenter IPs — which is exactly what a
- * GitHub Actions runner has. A scraper sending only a custom User-Agent gets
- * 403 from the runner while working fine from a home connection, so sites
- * behind such protection get the full header set a browser would send.
+ * Browser-shaped headers, sent to hosts behind bot protection. Measured on a CI
+ * runner against CineStar: these alone do NOT clear Cloudflare's managed
+ * challenge (403 with a "Just a moment..." body), because the challenge
+ * fingerprints the TLS handshake rather than the headers — headless Chromium
+ * was refused too, and only a replayed Chrome handshake got 200. They are still
+ * sent because they cost nothing and satisfy weaker filters, but the actual
+ * remedy is `tlsFallback`.
  */
 const BROWSER_HEADERS: Record<string, string> = {
   'User-Agent':
@@ -64,6 +68,11 @@ export interface FetchOptions {
   acceptEmptyStatus?: number[];
   /** Present as a browser. Needed for hosts behind bot protection. */
   browserLike?: boolean;
+  /**
+   * On 403, retry through a client that replays a real Chrome TLS handshake.
+   * Only this clears Cloudflare's managed challenge; see BROWSER_HEADERS.
+   */
+  tlsFallback?: boolean;
 }
 
 export class HttpError extends Error {
@@ -135,8 +144,22 @@ async function request(url: string, options: FetchOptions): Promise<Response> {
 }
 
 export async function fetchText(url: string, options: FetchOptions = {}): Promise<string> {
-  const response = await request(url, options);
-  return response.text();
+  try {
+    const response = await request(url, options);
+    return await response.text();
+  } catch (error) {
+    if (!options.tlsFallback || !(error instanceof HttpError) || error.status !== 403) {
+      throw error;
+    }
+    try {
+      return await fetchTextImpersonated(url);
+    } catch (fallbackError) {
+      // The original 403 is the more useful diagnosis; a missing interpreter is
+      // only worth reporting because it explains why the fallback did nothing.
+      if (fallbackError instanceof ImpersonateUnavailableError) throw error;
+      throw fallbackError;
+    }
+  }
 }
 
 export async function fetchJson<T>(url: string, options: FetchOptions = {}): Promise<T> {
