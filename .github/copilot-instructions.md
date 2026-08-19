@@ -46,10 +46,26 @@ These look like trivia, but each one was a real bug. See §10 of
   it alone uses `tlsFallback: true` (retry via `curl_cffi`); headers and even
   headless Chromium do not help (R-2.7a). A scraper can fail in CI while passing
   locally — read the Actions log, don't re-run locally.
+- Trailer language order is **sr → sh/hr/bs → en** and is already correct. TMDb
+  held **zero** `sr` trailers across 33 films, so Croatian ones are a legitimate
+  fallback — read the build's `Trejleri:` line before touching the ranking.
+
+## Analytics (§16)
+
+- Cloudflare Web Analytics, kept specifically because it is **cookieless** —
+  that is what spares the site a consent banner. Don't swap in anything that
+  stores an id on the device.
+- The beacon must keep `type="module"`, mirroring Cloudflare's own snippet:
+  `beacon.min.js` is an ES module, so a classic `defer` script risks failing at
+  parse time. Modules defer by default, so rendering is still unblocked.
+- `CF_BEACON_TOKEN` is a repository **variable** and is visible in the published
+  HTML **by design** — the visitor's browser reports the view. That is not a
+  leak, and making it a secret would only hide it from logs, not from the page.
+- No token ⇒ no beacon and no footer note, build unaffected. That's the off switch.
 
 ## Working in this repo
 
-- `npm test` (54 tests, no network — fixtures only) and `npx tsc --noEmit` must
+- `npm test` (83 tests, no network — fixtures only) and `npx tsc --noEmit` must
   both pass before committing.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.

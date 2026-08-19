@@ -279,11 +279,14 @@ new tab (`target="_blank" rel="noopener noreferrer"`). The link is built by
   wins — distributors sometimes label a Serbian upload `hr` — but country can
   never lift a video above a higher language band.
 
-  The build logs the resulting distribution (`Trejleri: sr 3 · hr 5 · en 2 ·
-  pretraga 24`). This exists because the ranking is only worth as much as TMDb's
+  The build logs the resulting distribution (`Trejleri: hr 10 · en 13 ·
+  pretraga 10`). This exists because the ranking is only worth as much as TMDb's
   catalogue: when a poster opens a Croatian trailer it is almost always because
   TMDb has no Serbian-tagged video for that film, and without the log that looks
-  indistinguishable from a ranking bug.
+  indistinguishable from a ranking bug. Measured 2026-08-19 across 33 films:
+  **`sr` was zero** — every regional trailer TMDb held was tagged `hr`. So the
+  Croatian wording users see ("uskoro u kinima" rather than "uskoro u
+  bioskopima") is a gap in TMDb, not a defect in the ordering.
 - **Search** — otherwise the link is a YouTube search for
   `"<title> <original title> trailer srpski"`. This is deliberate: Serbian
   trailers are uploaded by local distributors (Blitz, MegaCom, Taramount) and
@@ -419,7 +422,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **54 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **83 tests passing**, `tsc --noEmit` clean.
 
 ---
 
@@ -439,6 +442,7 @@ workflows are auto-disabled after 60 days of inactivity.
 readable by anyone who can see the repo and is exposed in logs);
 `CINEPLEXX_CLIENT_KEY` is a variable with a known default (it is a public value
 from their web bundle, so it must be overridable without a rebuild).
+`CF_BEACON_TOKEN` is likewise a **variable**, for the reasons in R-16.4.
 
 **R-13.4a** `TMDB_API_KEY` must be TMDb's **API Key (v3 auth)** — the 32-char
 hex string. The client authenticates with `?api_key=`, so the v4 "API Read
@@ -474,6 +478,14 @@ heuristic was found.
 built and deployed by GitHub Actions from `main`. Pages source is set to
 GitHub Actions, all three scrapers report `ok`, and the hourly workflow's
 data-refresh commit is confirmed working.
+
+**R-14.4 DONE — analytics enabled.** `CF_BEACON_TOKEN` is set as a repository
+variable and the beacon is confirmed present in the deployed HTML. See §16.
+
+**R-14.5 OPEN — no Serbian trailers exist on TMDb.** Measured 2026-08-19 across
+33 films: `sr` count was zero, so posters open Croatian or English trailers
+(R-8.10). Nothing to fix on this side; revisit only if TMDb's catalogue
+improves. The `Trejleri:` build line is the check.
 
 ---
 
@@ -543,6 +555,24 @@ is not measuring.
 **R-16.8 The token is not hardcoded**, so that a fork does not silently report
 its visitors to this project's Cloudflare account.
 
-**R-16.9 Figures are a floor, not a census.** Ad blockers and privacy browsers
-suppress the beacon. The hourly CI build never executes it, so automation cannot
-inflate the count.
+**R-16.9 Figures are a floor, not a census.** Ad blockers, privacy browsers and
+corporate DNS filtering suppress the beacon — `static.cloudflareinsights.com`
+does not even resolve on some networks. The hourly CI build never executes it,
+so automation cannot inflate the count.
+
+**R-16.10 The site tag is visible to every visitor, and that is inherent.** It
+is delivered in the page HTML because the *visitor's browser* is what reports
+the page view; there is no configuration in which it stays private and
+analytics still works. Do not treat a future sighting of it in the HTML as a
+leak, and do not "fix" it by moving it to a GitHub secret — that hides it in CI
+logs and repository settings while leaving it just as visible on the site,
+which is worse than honest.
+
+What it does *not* permit: access to the Cloudflare account, or reading the
+analytics data. The only abuse available is submitting fake page views.
+
+**R-16.11 Turning it off or rotating it must stay a one-step operation.**
+Delete the `CF_BEACON_TOKEN` repository variable and the next build ships pages
+with no beacon and no privacy note (R-16.5) — no code change, no redeploy of
+logic. To rotate, remove the site in Cloudflare Web Analytics, add it again and
+replace the variable's value; the replacement is equally public by R-16.10.

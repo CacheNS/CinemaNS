@@ -18,7 +18,7 @@ Serbian-language page per day plus a reusable `data.json`.
 ## Commands
 
 ```
-npm test          # 54 tests, fixtures only, no network
+npm test          # 83 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -54,6 +54,25 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   it alone uses `tlsFallback: true` (retry via `curl_cffi`); browser headers and
   even headless Chromium do not clear it (R-2.7a). 403 is retryable.
   A scraper can fail in CI while passing locally — read the Actions log.
+- Trailer language order is **sr → sh/hr/bs → en**, and it is already correct.
+  Measured across 33 films, TMDb held **zero** `sr` trailers, so posters legitimately
+  open Croatian ones. Check the build's `Trejleri:` line before "fixing" the
+  ranking (R-8.10).
+
+## Analytics (§16)
+
+- Cloudflare Web Analytics, chosen because it is **cookieless** — that is what
+  keeps the site free of a consent banner. Do not replace it with anything that
+  stores an id on the device.
+- The beacon tag must mirror Cloudflare's issued snippet, including
+  `type="module"`. `beacon.min.js` is an ES module; a classic `defer` script
+  risks a parse-time failure. Modules are deferred by default, so nothing blocks.
+- `CF_BEACON_TOKEN` is a repository **variable**, not a secret, and appears in
+  the published HTML by design — the visitor's browser is what reports the view.
+  **That is not a leak.** Moving it to a secret would hide it in logs while
+  leaving it just as visible on the site. It grants no account access; the only
+  abuse is faking page views.
+- No token ⇒ no beacon, no footer note, build unaffected. That is the off switch.
 
 ## Conventions
 

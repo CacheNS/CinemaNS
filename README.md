@@ -16,7 +16,8 @@ The combined programme of three Novi Sad cinemas on one fast page:
 
 It shows today plus the next 7 days, grouped by film, with age ratings, audience
 score, runtime, format (2D/3D/4DX/IMAX/ScreenX) and whether a screening is
-dubbed or subtitled. The interface itself is in Serbian.
+dubbed or subtitled. Clicking a poster opens the trailer. The interface itself
+is in Serbian.
 
 ## How it works
 
@@ -55,6 +56,24 @@ audience score is TMDb's `vote_average`, shown only from 20 votes upwards.
 
 **Without `TMDB_API_KEY` the site still works**, but there are no age ratings
 and no scores, and the "for children" filter relies on genre alone.
+
+### Trailers
+
+Clicking a poster opens a trailer in a new tab. Where TMDb knows a YouTube video
+for the film the link goes straight to it, preferring Serbian, then
+Croatian/Bosnian/Serbo-Croatian, then English — language outranks both video
+type and officiality, because a Serbian teaser serves this audience better than
+an official English trailer.
+
+In practice TMDb currently holds **no Serbian-tagged trailer at all** for this
+catalogue, so most posters open a Croatian or English one. That is a gap in
+TMDb's data rather than a bug in the ranking, and the build prints the actual
+distribution (`Trejleri: hr 10 · en 13 · pretraga 10`) so it stays visible.
+
+Where TMDb has no video, the link becomes a YouTube *search* instead of a guess:
+Serbian trailers are usually uploaded by local distributors and are often
+missing from TMDb. The tooltip changes accordingly ("Pogledaj trailer" versus
+"Potraži trailer na YouTube-u"), so the link never overstates what it knows.
 
 ## The TMDb key
 
@@ -129,6 +148,7 @@ Then configure the repository once:
 2. **Settings → Secrets and variables → Actions**
    - secret `TMDB_API_KEY` — without it there are no age ratings or scores
    - (optional) variable `CINEPLEXX_CLIENT_KEY`
+   - (optional) variable `CF_BEACON_TOKEN` — see *Visit counting* below
 3. **Actions → Build and deploy → Run workflow** for the first build, or wait
    for the next full hour.
 
@@ -142,6 +162,44 @@ good data, which also keeps the scheduled workflow alive) and deploys `dist/`.
 > `schedule` workflows in forked repositories, which would stop the hourly
 > refresh. If the project needs to change owner, use Settings → Transfer
 > ownership rather than forking: the history is kept and the old URL redirects.
+
+## Visit counting
+
+GitHub Pages keeps no access logs and offers no analytics API, and the
+repository traffic API counts views of the *repo page* on github.com rather
+than of the published site. So the only possible source of visit data is the
+visitor's own browser.
+
+The site uses **Cloudflare Web Analytics**, chosen because it is cookieless: it
+stores nothing on the device and does not fingerprint, so the site needs no
+consent banner. To enable it:
+
+1. Cloudflare dashboard → **Web Analytics** → **Add a site** (this is an
+   account-level page — *not* the "Add a site" on the dashboard home, which is
+   domain onboarding and would ask you to move your nameservers).
+2. Enter the hostname `<account>.github.io`, click the suggestion that appears,
+   then **Done**.
+3. From **Manage site**, copy the 32-character token out of
+   `data-cf-beacon='{"token":"…"}'`.
+4. Add it as the repository **variable** `CF_BEACON_TOKEN`.
+
+Leave the variable unset and no beacon is emitted at all — no analytics
+request, no footer note, build unaffected. Deleting it later is a complete off
+switch requiring no code change.
+
+> **The token is public, and that is by design.** It is delivered in the HTML of
+> every page, because the visitor's browser is what reports the page view. There
+> is no configuration in which it stays private and analytics still works, which
+> is why it is a repository *variable* and not a secret. It grants no access to
+> the Cloudflare account and cannot be used to read the statistics; the only
+> abuse available is submitting fake page views.
+
+Two caveats on the numbers. Cloudflare keys on hostname and the free plan has no
+path rules for sites it does not proxy, so it records everything under
+`<account>.github.io` — filter by path `/CinemaNS/` in the dashboard. And treat
+the totals as a floor rather than a census: ad blockers, privacy browsers and
+some corporate DNS suppress the beacon entirely. The hourly build never executes
+it, so automation cannot inflate the count.
 
 ## When something breaks
 
