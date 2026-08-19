@@ -1,5 +1,7 @@
 # Bioskopi u Novom Sadu
 
+**Uživo: <https://cachens.github.io/CinemaNS/>**
+
 > **Menjaš nešto u ovom repozitorijumu?** Prvo pročitaj
 > [`REQUIREMENTS.md`](REQUIREMENTS.md) — to je osnovna specifikacija projekta.
 

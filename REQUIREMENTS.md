@@ -397,24 +397,10 @@ degrades gracefully, but §6 is effectively inactive. This is the single highest
 title, because there is no second source to outrank Arena. Accepted; no reliable
 heuristic was found.
 
-**R-14.3 OPEN — not yet published.** The code is committed locally but has
-never been pushed: the remote `CacheNS/CinemaNS` has no branches yet.
-
-Publishing is blocked on repository access, not on the code. The session that
-built this is authenticated as `dkrivosija_microsoft`, which has only `pull`
-permission on `CacheNS/CinemaNS` (a different, personal account) and has no SSH
-key. Publishing under the authenticated account instead is also impossible: it
-is an Enterprise Managed User, which cannot create public repositories, and a
-private repository cannot use free Pages (R-13.6). A fork is ruled out by
-R-13.7.
-
-So the remaining step needs an account with push access to `CacheNS/CinemaNS`:
-
-```bash
-git push -u origin HEAD:main
-```
-
-then Pages source → GitHub Actions, and the `TMDB_API_KEY` secret (R-14.1).
+**R-14.3 DONE — published.** Live at <https://cachens.github.io/CinemaNS/>,
+built and deployed by GitHub Actions from `main`. Pages source is set to
+GitHub Actions, all three scrapers report `ok`, and the hourly workflow's
+data-refresh commit is confirmed working.
 
 ---
 
