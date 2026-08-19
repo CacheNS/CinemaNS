@@ -25,8 +25,10 @@ export interface TmdbMovie {
   imdbId?: string;
   /** Certification label per country, e.g. { US: 'PG-13', DE: '12' }. */
   certifications: Record<string, string>;
-  /** YouTube id of a Serbian-language trailer, when TMDb has one. */
+  /** YouTube id of the best available trailer, preferring Serbian. */
   trailerKey?: string;
+  /** ISO-639-1 language of `trailerKey`, so the build can report coverage. */
+  trailerLanguage?: string;
 }
 
 interface SearchResponse {
@@ -68,6 +70,7 @@ interface DetailsResponse {
       type?: string;
       official?: boolean;
       iso_639_1?: string;
+      iso_3166_1?: string;
     }[];
   };
 }
@@ -94,7 +97,14 @@ const LANGUAGE_RANK: Record<string, number> = {
   en: 1,
 };
 
-export function pickTrailerKey(videos: DetailsResponse['videos']): string | undefined {
+export interface PickedTrailer {
+  key: string;
+  /** ISO-639-1 code of the chosen video, kept so the build can report what it
+   *  actually found rather than what it hoped to find. */
+  language: string;
+}
+
+export function pickTrailer(videos: DetailsResponse['videos']): PickedTrailer | undefined {
   const candidates = (videos?.results ?? []).filter(
     (video) =>
       video.key &&
@@ -103,18 +113,33 @@ export function pickTrailerKey(videos: DetailsResponse['videos']): string | unde
   );
   if (!candidates.length) return undefined;
 
-  const rank = (video: { type?: string; official?: boolean; iso_639_1?: string }): number => {
+  const rank = (video: {
+    type?: string;
+    official?: boolean;
+    iso_639_1?: string;
+    iso_3166_1?: string;
+  }): number => {
     // Language dominates: a Serbian teaser is worth more to this audience than
     // an official English trailer, so it is weighted above type and officiality
     // combined.
-    let score = (LANGUAGE_RANK[video.iso_639_1 ?? ''] ?? 0) * 10;
+    let score = (LANGUAGE_RANK[video.iso_639_1 ?? ''] ?? 0) * 100;
+    // Distributors sometimes tag a Serbian upload with the regional language
+    // code but the Serbian country code, so country breaks ties within a
+    // language band without ever overriding the language order itself.
+    if (video.iso_3166_1 === 'RS') score += 10;
     if (video.type === 'Trailer') score += 4;
     else if (video.type === 'Teaser') score += 2;
     if (video.official) score += 1;
     return score;
   };
 
-  return [...candidates].sort((a, b) => rank(b) - rank(a))[0]?.key;
+  const best = [...candidates].sort((a, b) => rank(b) - rank(a))[0];
+  if (!best) return undefined;
+  return { key: best.key, language: best.iso_639_1 ?? 'unknown' };
+}
+
+export function pickTrailerKey(videos: DetailsResponse['videos']): string | undefined {
+  return pickTrailer(videos)?.key;
 }
 
 export class TmdbClient {
@@ -293,8 +318,11 @@ export class TmdbClient {
       movie.voteCount = data.vote_count ?? 0;
     }
     if (data.imdb_id) movie.imdbId = data.imdb_id;
-    const trailerKey = pickTrailerKey(data.videos);
-    if (trailerKey) movie.trailerKey = trailerKey;
+    const trailer = pickTrailer(data.videos);
+    if (trailer) {
+      movie.trailerKey = trailer.key;
+      movie.trailerLanguage = trailer.language;
+    }
     return movie;
   }
 }

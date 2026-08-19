@@ -102,6 +102,8 @@ export interface Movie {
   hasDubbed: boolean;
   /** YouTube id of a regional-language trailer, when one is known. */
   trailerKey?: string;
+  /** ISO-639-1 language of `trailerKey` ('sr', 'hr', 'en', …). */
+  trailerLanguage?: string;
   /** Every raw title seen at any cinema, for debugging merges. */
   aliases: string[];
   showtimes: Showtime[];

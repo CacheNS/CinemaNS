@@ -199,7 +199,10 @@ export async function mergeMovies(
 
     if (group.tmdb) {
       movie.tmdbId = group.tmdb.id;
-      if (group.tmdb.trailerKey) movie.trailerKey = group.tmdb.trailerKey;
+      if (group.tmdb.trailerKey) {
+        movie.trailerKey = group.tmdb.trailerKey;
+        if (group.tmdb.trailerLanguage) movie.trailerLanguage = group.tmdb.trailerLanguage;
+      }
       if (group.tmdb.originalTitle && group.tmdb.originalTitle !== movie.title) {
         movie.originalTitle = group.tmdb.originalTitle;
       }

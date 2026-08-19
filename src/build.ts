@@ -9,7 +9,7 @@ import { scrapeCinestar } from './adapters/cinestar.js';
 import { windowDays } from './core/dates.js';
 import { mergeMovies } from './core/merge.js';
 import { CINEMAS, CINEMA_IDS } from './core/types.js';
-import type { CinemaId, RawMovie, Snapshot, SourceStatus } from './core/types.js';
+import type { CinemaId, Movie, RawMovie, Snapshot, SourceStatus } from './core/types.js';
 import { TmdbClient } from './tmdb/client.js';
 import { renderPages } from './render/html.js';
 import { MANIFEST, renderIcon } from './render/icon.js';
@@ -44,6 +44,33 @@ async function readJson<T>(file: string, fallback: T): Promise<T> {
 
 function countShowtimes(movies: RawMovie[]): number {
   return movies.reduce((total, movie) => total + movie.showtimes.length, 0);
+}
+
+/**
+ * Reports which language each poster's trailer actually came from.
+ *
+ * The picker prefers Serbian, then the neighbouring languages, then English —
+ * but that preference is only worth as much as TMDb's catalogue, which often
+ * has a Croatian upload and no Serbian one. Printing the real distribution
+ * keeps that gap visible instead of letting it look like a ranking bug.
+ */
+function summarizeTrailers(movies: Movie[]): string {
+  const counts = new Map<string, number>();
+  for (const movie of movies) {
+    const bucket = movie.trailerKey ? (movie.trailerLanguage ?? 'nepoznat') : 'pretraga';
+    counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+  }
+  const order = ['sr', 'sh', 'hr', 'bs', 'en'];
+  const rank = (lang: string): number => {
+    const index = order.indexOf(lang);
+    return index === -1 ? order.length : index;
+  };
+  return (
+    [...counts.entries()]
+      .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+      .map(([lang, count]) => `${lang} ${count}`)
+      .join(' · ') || 'nema'
+  );
 }
 
 /** Drops showtimes that fell out of the current window (relevant for stale data). */
@@ -146,6 +173,7 @@ export async function build(): Promise<Snapshot> {
       diagnostics.tmdbResolved + diagnostics.tmdbUnresolved
     } · nepoznat jezik: ${diagnostics.unknownAudioShowtimes} projekcija`,
   );
+  console.log(`Trejleri: ${summarizeTrailers(movies)}`);
 
   await mkdir(DATA_DIR, { recursive: true });
   await writeFile(RAW_CACHE, JSON.stringify(rawCache), 'utf8');

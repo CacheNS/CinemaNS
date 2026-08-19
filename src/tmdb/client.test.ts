@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { TmdbClient, pickTrailerKey } from './client.js';
+import { TmdbClient, pickTrailer, pickTrailerKey } from './client.js';
 
 /** Swap in a fetch that always answers with `status`, restoring the original. */
 async function withStubbedFetch<T>(status: number, run: () => Promise<T>): Promise<T> {
@@ -109,4 +109,41 @@ test('non-YouTube and unknown-language videos are ignored', () => {
 test('a film with no videos yields no key', () => {
   assert.equal(pickTrailerKey(undefined), undefined);
   assert.equal(pickTrailerKey({ results: [] }), undefined);
+});
+
+test('the full order is Serbian, then the neighbours, then English', () => {
+  const all = [
+    { key: 'en1', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'en' },
+    { key: 'hr1', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'hr' },
+    { key: 'sr1', site: 'YouTube', type: 'Teaser', iso_639_1: 'sr' },
+  ];
+  assert.equal(pickTrailer({ results: all })?.language, 'sr');
+  assert.equal(pickTrailer({ results: all.slice(0, 2) })?.language, 'hr');
+  assert.equal(pickTrailer({ results: all.slice(0, 1) })?.language, 'en');
+});
+
+test('the Serbian country code breaks ties inside one language band', () => {
+  // Distributors sometimes tag a Serbian upload as 'hr' but with country RS.
+  assert.equal(
+    pickTrailer({
+      results: [
+        { key: 'hr-hr', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'hr', iso_3166_1: 'HR' },
+        { key: 'hr-rs', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'hr', iso_3166_1: 'RS' },
+      ],
+    })?.key,
+    'hr-rs',
+  );
+});
+
+test('country never outranks language', () => {
+  // An English video from Serbia must not beat a Croatian one.
+  assert.equal(
+    pickTrailer({
+      results: [
+        { key: 'en-rs', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'en', iso_3166_1: 'RS' },
+        { key: 'hr-hr', site: 'YouTube', type: 'Teaser', iso_639_1: 'hr', iso_3166_1: 'HR' },
+      ],
+    })?.key,
+    'hr-hr',
+  );
 });
