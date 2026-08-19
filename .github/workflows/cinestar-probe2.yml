@@ -1,0 +1,56 @@
+# Temporary diagnostic, round 2. Round 1 established that CineStar serves a
+# Cloudflare "Just a moment..." managed challenge (403) to the runner while
+# robots.txt returns 200, so headers alone can never work. This round tests the
+# two strategies that can actually clear a challenge.
+name: cinestar-probe2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  paths:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Which paths are challenged?
+        run: |
+          for p in / /robots.txt /sitemap.xml /novi-sad-big /novi-sad-big/ /repertoar; do
+            printf '%-22s %s\n' "$p" "$(curl -s -o /dev/null -w '%{http_code}' "https://cinestarcinemas.rs$p")"
+          done
+
+  impersonate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: curl_cffi with a real Chrome TLS fingerprint
+        run: |
+          pip install --quiet curl_cffi
+          python - <<'PY'
+          from curl_cffi import requests
+          for imp in ("chrome", "chrome124", "safari17_0"):
+              try:
+                  r = requests.get("https://cinestarcinemas.rs/novi-sad-big", impersonate=imp, timeout=30)
+                  print(imp, r.status_code, len(r.text), "CHALLENGE" if "Just a moment" in r.text else "OK")
+              except Exception as e:
+                  print(imp, "err", e)
+          PY
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Headless Chromium via Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --silent playwright >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+          node - <<'JS'
+          const { chromium } = require('playwright');
+          (async () => {
+            const b = await chromium.launch();
+            const p = await b.newPage();
+            const r = await p.goto('https://cinestarcinemas.rs/novi-sad-big', { waitUntil: 'domcontentloaded', timeout: 60000 });
+            console.log('initial status', r && r.status());
+            await p.waitForTimeout(8000);
+            const html = await p.content();
+            console.log('length', html.length, html.includes('Just a moment') ? 'CHALLENGE' : 'OK');
+            await b.close();
+          })().catch(e => { console.log('err', e.message); process.exit(0); });
+          JS
