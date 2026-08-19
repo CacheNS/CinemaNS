@@ -47,7 +47,10 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
    film page is positional prose, so it yields the *director* when a film has no
    original title, and it rounds runtimes.
 5. **Domestic Serbian films are `audio: 'original'`**, remapped at merge level
-   so every cinema shows the same label (§10.4–10.5).
+   so every cinema shows the same label (§10.4–10.5). The country signal comes
+   only from Arena, which exists only in Novi Sad, so TMDb's
+   `original_language == 'sr'` is a second signal for Beograd (§10.5.1) —
+   Serbian only, since a Croatian film is not "domaći".
 6. **`4DX/3D/TITL` is `"4DX 3D"`** — premium formats compose with 3D (§10.2).
 7. **`DS` is not a dubbing marker; CineStar's `.age` is genre** (§10.6–10.7).
 8. **Parse Arena by DOM label, not body regex** — its rows run together
@@ -89,7 +92,7 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 
 ```
 npx tsc --noEmit
-npm test          # 102 tests, fixtures only, no network
+npm test          # 104 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```
@@ -119,6 +122,10 @@ parser was broken against the live page (§12.3).
   URL that still would not be `kokice.org`. The rename waits for the domain move
   and happens once.
 - **Both cities share one page on purpose** (§7b.2). The payload objection was
-  measured, not assumed: pages gzip 11–14× and GitHub Pages serves gzip, so both
-  cities are ~18 KB over the wire. The known cost is SEO — one page cannot have
-  a city-specific `<title>` (§7b.9).
+  measured, not assumed: measured on production, a full day page carrying both
+  cities is 157 KB raw but **10.0 KB over the wire** (15.7× gzip, and GitHub
+  Pages serves gzip). The known cost is SEO — one page cannot have a
+  city-specific `<title>` (§7b.9).
+- **CineStar clears Cloudflare from Actions at both venues** via `tlsFallback`
+  (§2.7a-ii). Verified in the first production build after Beograd was added.
+  Do not go looking for a new workaround unless a build actually fails.

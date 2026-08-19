@@ -29,6 +29,11 @@ export interface TmdbMovie {
   trailerKey?: string;
   /** ISO-639-1 language of `trailerKey`, so the build can report coverage. */
   trailerLanguage?: string;
+  /**
+   * ISO-639-1 language the film was shot in. Used to recognise domestic films
+   * in cities where no cinema publishes a country of production.
+   */
+  originalLanguage?: string;
 }
 
 interface SearchResponse {
@@ -45,6 +50,7 @@ interface DetailsResponse {
   id: number;
   title?: string;
   original_title?: string;
+  original_language?: string;
   overview?: string;
   poster_path?: string | null;
   runtime?: number | null;
@@ -312,6 +318,7 @@ export class TmdbClient {
       certifications,
     };
     if (data.poster_path) movie.posterUrl = `${IMAGE_BASE}${data.poster_path}`;
+    if (data.original_language) movie.originalLanguage = data.original_language;
     if (data.overview) movie.overview = toSerbianLatin(data.overview);
     if (data.runtime) movie.runtimeMinutes = data.runtime;
     if (data.release_date) {

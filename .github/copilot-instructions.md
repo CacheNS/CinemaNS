@@ -51,6 +51,9 @@ These look like trivia, but each one was a real bug. See §10 of
 - CineStar's `.age` field contains **genre**, not an age rating.
 - Domestic Serbian films are `audio: 'original'` ("domaći film"), never
   "titlovano" — and the remap happens at merge level so all cinemas agree.
+  Only Arena publishes the country of production and Arena is Novi-Sad-only, so
+  TMDb's `original_language == 'sr'` backs it up in Beograd (R-10.5.1). Serbian
+  only: a Croatian film plays untranslated but is not "domaći".
 - **The page is Serbian Latin, never Cyrillic.** TMDb's `sr-RS` responses are
   Cyrillic, converted at the TMDb boundary and again inside `escapeHtml`. Use
   `toSerbianLatin()` (keeps diacritics) for display, never `transliterate()`
@@ -80,7 +83,7 @@ These look like trivia, but each one was a real bug. See §10 of
 
 ## Working in this repo
 
-- `npm test` (102 tests, no network — fixtures only) and `npx tsc --noEmit` must
+- `npm test` (104 tests, no network — fixtures only) and `npx tsc --noEmit` must
   both pass before committing.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.

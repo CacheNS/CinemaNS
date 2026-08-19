@@ -104,6 +104,11 @@ refused us" rather than "Python is missing", and the build degrades to
 CineStar's last good data (R-11.2). `KOKICE_DISABLE_IMPERSONATE=1` forces it
 off, which is how the tests stay offline.
 
+**R-2.7a-ii Confirmed in CI for both CineStar venues.** The first production
+build after Beograd was added scraped `cinestar-novi-sad` (276 showtimes) and
+`cinestar-beograd-ada` (211) from a GitHub Actions runner. The challenge is
+per-host, not per-venue, so one `tlsFallback` covers every CineStar location.
+
 **R-2.7b A 403 is retryable.** Unlike other 4xx codes, a 403 from bot
 protection is a scoring decision about the caller rather than a statement about
 the resource, so it gets the same backoff retry as 429 and 5xx.
@@ -241,7 +246,7 @@ kid-friendly; Horror ⇒ 16+; otherwise show **"Uzrast nepoznat"**.
 **R-6.5 Never present a guess as fact.** Non-confident ratings are visually
 marked, and are marked especially when the "Za decu" filter is active.
 
-**R-6.6** None of the three cinemas publish a usable age rating — verified.
+**R-6.6** None of the three chains publish a usable age rating — verified.
 Cineplexx returns `rating: "o.A."` for every film; Arena and CineStar have no
 certification markup. Do not attempt to source age from the cinemas.
 
@@ -285,8 +290,9 @@ the default.
 reload. Measured, not assumed: a day page is ~50–81 KB raw but compresses
 **11–14×**, and GitHub Pages does serve gzip (verified with
 `curl -H "Accept-Encoding: gzip"` — `Content-Encoding: gzip`,
-`Content-Length: 7020`). Both cities together are ~18 KB over the wire, less
-than one poster image.
+`Content-Length: 7020`). Confirmed on production once both cities shipped: a
+full day page is **157 KB raw → 10.0 KB over the wire** (15.7×), less than one
+poster image.
 
 **R-7b.3 City is a property of the cinema block**, so the switch is one extra
 condition inside the existing `apply()` loop rather than a second mechanism.
@@ -464,8 +470,17 @@ Rationale, both confirmed on live pages:
 "titlovano". The signal is Arena's `Zemlja porekla: RS`.
 
 **R-10.5** The domestic remap is applied at **merge level**, not adapter level,
-so all three cinemas show the same label for the same film even when only one
+so every venue shows the same label for the same film even when only one
 cinema published the country.
+
+**R-10.5.1 The country signal is Novi-Sad-only, so TMDb backs it up.** Only
+Arena publishes `Zemlja porekla`, and Arena has no Beograd venue, so a domestic
+film playing exclusively in Beograd has no country signal at all and would be
+labelled "titlovano". TMDb's `original_language == 'sr'` is therefore accepted
+as a second domestic signal. It is deliberately a *second* signal: with no TMDb
+key the build behaves exactly as before (R-8.1). Serbian only — Croatian and
+Bosnian films also play untranslated, but "domaći film" would be a false claim
+about them.
 
 **R-10.6** `DS` in an Arena title is **not** a dubbing marker. It appears on
 both a dubbed cartoon and a domestic Serbian film. Do not infer audio from it.
@@ -515,7 +530,7 @@ can never replace a good site with an empty one.
 
 **R-11.5** A source that has never succeeded is shown as unavailable.
 
-**R-11.6** The workflow fails loudly if all three scrapers break, so a broken
+**R-11.6** The workflow fails loudly if every scrape breaks, so a broken
 parser surfaces as a red build rather than a silently empty site.
 
 **R-11.7** The build reports TMDb resolution coverage so degradation is visible.
@@ -542,7 +557,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **102 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **104 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same

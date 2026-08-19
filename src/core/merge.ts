@@ -31,6 +31,19 @@ function byMetadataTrust(raws: RawMovie[]): RawMovie[] {
 /** Productions whose original language is Serbian, so they play untranslated. */
 const DOMESTIC_COUNTRIES = new Set(['RS', 'SRB', 'SR']);
 
+/**
+ * TMDb's language code for Serbian productions. Only Arena publishes a country
+ * of production, and Arena exists only in Novi Sad, so a domestic film playing
+ * exclusively in Beograd has no country signal at all. TMDb's original language
+ * is city-independent and covers that gap — as a second signal, never the only
+ * one, so the build still behaves as before when TMDb is unavailable.
+ *
+ * Deliberately Serbian only. Croatian and Bosnian films also play untranslated
+ * here, but the label reads "domaći film" and calling a Croatian production
+ * domestic would be wrong — the same class of error as R-10.1.
+ */
+const DOMESTIC_LANGUAGES = new Set(['sr']);
+
 interface Group {
   key: string;
   tmdb: TmdbMovie | null;
@@ -175,7 +188,9 @@ export async function mergeMovies(
   const movies: Movie[] = groups.map((group) => {
     // A domestic film plays in Serbian, so "titlovano" would be wrong for it
     // no matter which cinema reported the screening.
-    const domestic = group.raws.some((raw) => DOMESTIC_COUNTRIES.has(raw.originCountry ?? ''));
+    const domestic =
+      group.raws.some((raw) => DOMESTIC_COUNTRIES.has(raw.originCountry ?? '')) ||
+      DOMESTIC_LANGUAGES.has(group.tmdb?.originalLanguage ?? '');
     const showtimes = sortShowtimes(group.raws.flatMap((raw) => raw.showtimes)).map((showtime) =>
       domestic && showtime.audio === 'subtitled'
         ? { ...showtime, audio: 'original' as const }

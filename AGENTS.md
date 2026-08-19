@@ -19,7 +19,7 @@ its old name deliberately (R-13.8).
 ## Commands
 
 ```
-npm test          # 102 tests, fixtures only, no network
+npm test          # 104 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -57,7 +57,9 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
 - `DS` in an Arena title is not a dubbing marker.
 - CineStar's `.age` field holds genre, not an age rating.
 - Domestic Serbian films are `audio: 'original'` ("domaći film"), remapped at
-  merge level so all cinemas agree.
+  merge level so all cinemas agree. Only Arena publishes the country and Arena
+  is Novi-Sad-only, so TMDb's `original_language == 'sr'` is a second signal
+  (R-10.5.1). Serbian only — a Croatian film is not "domaći".
 - The page is Serbian **Latin**, never Cyrillic (R-8.12). TMDb's `sr-RS` text is
   Cyrillic; it is converted at the TMDb boundary and again in `escapeHtml`. Use
   `toSerbianLatin()` for display — `transliterate()` folds diacritics and is for

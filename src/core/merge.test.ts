@@ -202,6 +202,51 @@ test('a domestic film is neither dubbed nor subtitled', async () => {
   assert.ok(foreign.movies[0]?.showtimes.every((s) => s.audio === 'subtitled'));
 });
 
+test('a domestic film is recognised in a city that has no Arena', async () => {
+  // Only Arena publishes a country of production and Arena exists only in Novi
+  // Sad, so a domestic film playing exclusively in Beograd used to come out
+  // "titlovano". TMDb's original language is the city-independent fallback.
+  const tmdb = new TmdbClient(undefined);
+  tmdb.resolve = async (lookup: { cleanTitle: string }) =>
+    ({
+      id: 1,
+      title: lookup.cleanTitle,
+      originalTitle: lookup.cleanTitle,
+      originalLanguage: 'sr',
+      genres: [],
+      adult: false,
+      certifications: {},
+    }) as never;
+
+  const { movies } = await mergeMovies(
+    [raw('cineplexx-usce', 'Nedelja', 'Nedelja'), raw('cinestar-beograd-ada', 'Nedelja', 'Nedelja')],
+    tmdb,
+  );
+
+  assert.equal(movies.length, 1);
+  assert.ok(movies[0]?.showtimes.length);
+  assert.ok(movies[0]?.showtimes.every((s) => s.audio === 'original'));
+});
+
+test('a foreign film is not called domestic just because TMDb resolved it', async () => {
+  const tmdb = new TmdbClient(undefined);
+  tmdb.resolve = async (lookup: { cleanTitle: string }) =>
+    ({
+      id: 2,
+      title: lookup.cleanTitle,
+      originalTitle: lookup.cleanTitle,
+      originalLanguage: 'hr',
+      genres: [],
+      adult: false,
+      certifications: {},
+    }) as never;
+
+  // Croatian films also play untranslated here, but "domaći film" would be a
+  // false claim about a foreign production.
+  const { movies } = await mergeMovies([raw('cineplexx-usce', 'Ćiro', 'Ćiro')], tmdb);
+  assert.ok(movies[0]?.showtimes.every((s) => s.audio === 'subtitled'));
+});
+
 /**
  * Resolves only the listings whose cleanTitle is in `known`, which is what real
  * TMDb resolution looks like: it is per-listing, so one cinema's spelling of a
