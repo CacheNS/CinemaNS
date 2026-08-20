@@ -926,10 +926,22 @@ nothing and closes the usual npm supply-chain path. `pip install curl_cffi`
 was unpinned, which made every build depend on whatever was published that
 morning.
 
-**R-17.17 Dependabot *alerts* must be enabled in repository settings.** They are
-currently off, which cannot be changed from code — `.github/dependabot.yml`
-configures update PRs, not vulnerability alerting. This is a manual toggle under
-Settings → Code security.
+**R-17.17 Dependabot *alerts* are enabled, and that is separate from
+`dependabot.yml`.** The file configures *version updates* — routine bumps — and
+does not switch on vulnerability alerting; the two are conflated constantly.
+Alerts were off despite the public-repo default and were enabled by hand under
+Settings → Code security. Do not assume the config file covers it if alerting
+is ever seen to be off again; the API says so plainly (`GET
+/repos/.../dependabot/alerts` answers `403 Dependabot alerts are disabled for
+this repository` when it is off, and a different `403` about token scope when
+it is on).
+
+**R-17.17a Pins are expected to move, and letting them rot is the failure
+mode.** Within a minute of the first build after `dependabot.yml` landed,
+Dependabot opened six PRs, and every action pin was a major behind — the run
+had annotated all five with "Node.js 20 is deprecated". They were taken in one
+commit rather than five sequential rebases, because every action PR edits the
+same file. `deploy-pages` stays at v4 because that is still current.
 
 ### Examined and deliberately unchanged
 
