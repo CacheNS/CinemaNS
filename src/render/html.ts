@@ -23,8 +23,62 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Defence in depth behind `escapeHtml`/{@link safeUrl}, not instead of them:
+ * this page is assembled from three cinema sites plus TMDb, so if an escaping
+ * gap ever slips through, the CSP is what stops it becoming script execution.
+ *
+ * It can be this strict because the page has no inline script and no inline
+ * style — the only third party is the Cloudflare beacon, which also needs
+ * `connect-src` to report the page view. `img-src https:` stays deliberately
+ * broad, since posters arrive from several CDNs, but it still refuses
+ * `javascript:` and `data:` script vectors. `frame-ancestors` is omitted
+ * because a meta-tag CSP ignores it; that one needs a real response header,
+ * which GitHub Pages does not let us set.
+ */
+const CSP = [
+  "default-src 'none'",
+  "script-src 'self' https://static.cloudflareinsights.com",
+  "connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com",
+  "style-src 'self'",
+  "img-src 'self' https: data:",
+  "font-src 'self'",
+  "manifest-src 'self'",
+  "worker-src 'self'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join('; ');
+
 function pageName(date: string, days: string[]): string {
   return date === days[0] ? 'index.html' : `${date}.html`;
+}
+
+/**
+ * Escaping alone does not make a URL safe to put in an `href` or `src`:
+ * `javascript:alert(1)` contains no character `escapeHtml` touches, so it
+ * survives intact and runs on click. Every URL on this page — booking links,
+ * cinema sites, posters, trailers, score links — comes from a third party we
+ * do not control, and Arena in particular is fetched over plaintext HTTP.
+ *
+ * So schemes are allow-listed rather than denied: only `http`, `https` and
+ * `mailto` reach the document, and anything else (including protocol-relative
+ * `//evil.test` and `data:`) is dropped. Relative URLs are kept, since the
+ * page's own assets are relative.
+ */
+export function safeUrl(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (/^\/\//.test(trimmed)) return undefined;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      return undefined;
+    }
+    if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) return undefined;
+  }
+  return escapeHtml(trimmed);
 }
 
 function audioLabel(audio: Showtime['audio']): string {
@@ -59,9 +113,14 @@ function renderShowtime(showtime: Showtime): string {
   const details = [showtime.format, audioLabel(showtime.audio)];
   if (showtime.hall) details.push(showtime.hall);
 
+  // A booking URL that is not a plain web link is not shown as one; the venue's
+  // own programme is the sanctioned fallback (§8.1a), and it comes from our
+  // static registry rather than from a scrape.
+  const href = safeUrl(showtime.bookingUrl) ?? safeUrl(cinema.url) ?? '#';
+
   return `
         <a class="showtime showtime--${showtime.audio}"
-           href="${escapeHtml(showtime.bookingUrl)}"
+           href="${href}"
            rel="noopener nofollow"
            target="_blank"
            data-audio="${showtime.audio}"
@@ -86,7 +145,7 @@ function renderCinemaBlock(
   const hidden = cinema.city === DEFAULT_CITY ? '' : ' hidden';
   return `
       <div class="cinema" data-cinema="${cinemaId}" data-city="${cinema.city}"${hidden}>
-        <a class="cinema__name" href="${escapeHtml(cinema.url)}" rel="noopener" target="_blank">${escapeHtml(
+        <a class="cinema__name" href="${safeUrl(cinema.url) ?? '#'}" rel="noopener" target="_blank">${escapeHtml(
           cinema.shortName,
         )}</a>
         <div class="showtimes">${showtimes.map(renderShowtime).join('')}
@@ -117,8 +176,9 @@ function renderScoreBadge(movie: Movie): string {
   const label = `<span class="badge badge--score" title="${escapeHtml(title)}">★ ${escapeHtml(
     value,
   )}<span class="badge__sub">/10 ${escapeHtml(score.source)}</span></span>`;
-  return score.url
-    ? `<a class="badge-link" href="${escapeHtml(score.url)}" rel="noopener nofollow" target="_blank">${label}</a>`
+  const scoreHref = score.url ? safeUrl(score.url) : undefined;
+  return scoreHref
+    ? `<a class="badge-link" href="${scoreHref}" rel="noopener nofollow" target="_blank">${label}</a>`
     : label;
 }
 
@@ -185,15 +245,19 @@ function renderMovie(movie: Movie, date: string): string {
   const hidden = cities.includes(DEFAULT_CITY) ? '' : ' hidden';
 
   const trailer = trailerLink(movie);
-  const posterImage = movie.posterUrl
-    ? `<img class="poster" src="${escapeHtml(movie.posterUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+  const posterSrc = movie.posterUrl ? safeUrl(movie.posterUrl) : undefined;
+  const posterImage = posterSrc
+    ? `<img class="poster" src="${posterSrc}" alt="" loading="lazy" referrerpolicy="no-referrer">`
     : `<div class="poster poster--empty" aria-hidden="true"></div>`;
+  const trailerHref = safeUrl(trailer.url);
   // Wrapped rather than replaced, so a film with no poster is still clickable.
-  const poster = `<a class="poster-link" href="${escapeHtml(trailer.url)}"
+  const poster = trailerHref
+    ? `<a class="poster-link" href="${trailerHref}"
        target="_blank" rel="noopener noreferrer"
        title="${trailer.exact ? 'Pogledaj trailer' : 'Potraži trailer na YouTube-u'}"
        aria-label="${escapeHtml(`Trailer za ${movie.title}`)}"
-    >${posterImage}<span class="poster-play" aria-hidden="true"></span></a>`;
+    >${posterImage}<span class="poster-play" aria-hidden="true"></span></a>`
+    : `<div class="poster-link">${posterImage}</div>`;
 
   const meta: string[] = [];
   if (movie.genres.length) meta.push(movie.genres.slice(0, 3).join(', '));
@@ -352,6 +416,7 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="${CSP}">
   <title>Kokice.org — ${escapeHtml(formatDayLabel(date, days[0]))}</title>
   <meta name="description" content="Kokice — objedinjen repertoar bioskopa u Novom Sadu i Beogradu, osvežen svakog sata.">
   <link rel="stylesheet" href="assets/style.css">

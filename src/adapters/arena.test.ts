@@ -126,3 +126,29 @@ test('reads the country of production', () => {
   assert.equal(parseArenaOriginCountry(html), 'RS');
   assert.equal(parseArenaOriginCountry('<body>nema podataka</body>'), undefined);
 });
+
+test('a booking link pointing off Arena is refused rather than rendered', () => {
+  // Arena is the one source fetched over plaintext HTTP, so its markup is the
+  // most tamperable input we have: an injected link must not become a chip.
+  const hostile = film.replace(
+    /href="([^"]*numSale[^"]*)"/,
+    'href="https://phishing.test/pay"',
+  );
+  const showtimes = parseArenaShowtimes(hostile, { url: `${'http://www.arenacineplex.com'}/film/1` }, FIXTURE_DAYS);
+  for (const showtime of showtimes) {
+    assert.ok(
+      /^https?:\/\/(www\.arenacineplex\.com|ulaznice\.arenacineplex\.com)\//.test(showtime.bookingUrl),
+      `off-origin booking URL survived: ${showtime.bookingUrl}`,
+    );
+  }
+});
+
+test('a javascript: link in Arena markup never reaches a listing', () => {
+  const hostile = home.replace(/href="\/film\//, 'href="javascript:alert(1)#/film/');
+  for (const listing of parseArenaListings(hostile)) {
+    assert.ok(listing.url.startsWith('http://www.arenacineplex.com/'), listing.url);
+    if (listing.posterUrl) {
+      assert.ok(listing.posterUrl.startsWith('http://www.arenacineplex.com/'), listing.posterUrl);
+    }
+  }
+});

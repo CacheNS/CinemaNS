@@ -19,7 +19,7 @@ its old name deliberately (R-13.8).
 ## Commands
 
 ```
-npm test          # 110 tests, fixtures only, no network
+npm test          # 122 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -112,3 +112,30 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   reproduce the *real* markup — a simplified fixture once passed while the
   parser was broken against the live page.
 - CSS badge modifier rules must stay after the base `.badge` rule.
+
+## Security (§17)
+
+A three-agent review found 0 critical and 0 high issues. What it hardened, and
+what a well-meaning change could undo:
+
+- **The realistic attacker is an upstream cinema site, not a visitor** (R-17.1).
+  No login, no database, no server. Do not import fixes for threats this design
+  does not have.
+- **`safeUrl()` guards every `href`/`src`** (R-17.8). `escapeHtml` does not stop
+  `javascript:` — it contains nothing to escape. A rejected booking URL falls
+  back to the venue programme, never to nothing.
+- **The page has a strict CSP and therefore no inline script or style**
+  (R-17.9). Adding either breaks the site; a test asserts their absence.
+- **Fetches are size-capped, deadline-bound and redirect-capped** (R-17.3–4),
+  and the `curl_cffi` child is killed after 60 s (R-17.5).
+- **Arena URLs are origin-allow-listed** (R-17.6) because Arena is fetched over
+  plaintext HTTP and cannot be upgraded.
+- **Titles are capped at 300 chars** before the quadratic regexes (R-17.7).
+- **Workflow permissions are per job** (R-17.12): `build` runs the scraper with
+  no write access; `persist` and `deploy` hold one permission each. `deploy`
+  must never depend on `persist` (R-17.13).
+- **The `data/raw.json` commit is load bearing** (R-17.14) — it is also what
+  stops GitHub disabling the hourly schedule. Do not replace it with a cache.
+- **Actions are SHA-pinned and `npm ci` runs `--ignore-scripts`** (R-17.15–16).
+- **TLS verification is intact** (R-17.18). The impersonation replays a Chrome
+  handshake fingerprint and nothing more — do not "fix" it away.

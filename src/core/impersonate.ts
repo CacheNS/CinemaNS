@@ -19,6 +19,15 @@ sys.stdout.buffer.write(r.content)
 
 const CANDIDATES = ['python3', 'python'];
 
+/**
+ * The Python side already has a request timeout, but nothing bounded the child
+ * process itself: an interpreter that hung after its request — or one blocked
+ * writing to a full pipe — would stall the hourly build forever with no way to
+ * reap it. These two ceilings make the subprocess as bounded as a native fetch.
+ */
+const SUBPROCESS_TIMEOUT_MS = 60_000;
+const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
+
 let cachedInterpreter: string | null | undefined;
 
 function tryRun(command: string, args: string[]): Promise<{ ok: boolean; out: Buffer; err: string }> {
@@ -26,10 +35,43 @@ function tryRun(command: string, args: string[]): Promise<{ ok: boolean; out: Bu
     const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     const out: Buffer[] = [];
     let err = '';
-    child.stdout.on('data', (chunk: Buffer) => out.push(chunk));
-    child.stderr.on('data', (chunk: Buffer) => (err += chunk.toString('utf8')));
-    child.on('error', (error) => resolve({ ok: false, out: Buffer.alloc(0), err: error.message }));
-    child.on('close', (code) => resolve({ ok: code === 0, out: Buffer.concat(out), err }));
+    let size = 0;
+    let settled = false;
+
+    const finish = (result: { ok: boolean; out: Buffer; err: string }): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      // SIGKILL rather than SIGTERM: a wedged interpreter may never handle a
+      // polite signal, and this path only runs when it is already misbehaving.
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      resolve(result);
+    };
+
+    const deadline = setTimeout(
+      () =>
+        finish({
+          ok: false,
+          out: Buffer.alloc(0),
+          err: `nema odgovora nakon ${SUBPROCESS_TIMEOUT_MS} ms`,
+        }),
+      SUBPROCESS_TIMEOUT_MS,
+    );
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      size += chunk.byteLength;
+      if (size > MAX_OUTPUT_BYTES) {
+        finish({ ok: false, out: Buffer.alloc(0), err: 'odgovor je prevelik' });
+        return;
+      }
+      out.push(chunk);
+    });
+    // Bounded too, so a chatty failure cannot grow without limit.
+    child.stderr.on('data', (chunk: Buffer) => {
+      if (err.length < 4096) err += chunk.toString('utf8');
+    });
+    child.on('error', (error) => finish({ ok: false, out: Buffer.alloc(0), err: error.message }));
+    child.on('close', (code) => finish({ ok: code === 0, out: Buffer.concat(out), err }));
   });
 }
 

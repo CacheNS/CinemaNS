@@ -9,10 +9,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Deliberately read-only at the top level. The build job parses HTML and JSON
+# from three cinema sites it does not control, so it is the one job an attacker
+# could plausibly reach — and it must not be able to write to the repository or
+# publish to Pages. The two jobs that need write access are separate, tiny, and
+# touch no untrusted input.
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 # Never let two refreshes deploy over each other.
 concurrency:
@@ -22,38 +25,76 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      # Actions are pinned to commit SHAs rather than floating tags: a tag can
+      # be moved to point at new code, so `@v4` is a standing invitation to run
+      # whatever that tag means tomorrow.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           cache: npm
 
-      - run: npm ci
+      # No dependency in the lockfile declares an install script (verified:
+      # zero `hasInstallScript` entries), so refusing to run them costs nothing
+      # and closes the usual npm supply-chain path.
+      - run: npm ci --ignore-scripts
 
       # CineStar is behind a Cloudflare managed challenge that fingerprints the
       # TLS handshake, so Node's fetch is refused from the runner no matter what
       # headers it sends. curl_cffi replays a real Chrome handshake and is the
       # only method measured to get through. The build degrades to CineStar's
       # last good data if this step ever fails, so it must not be fatal.
+      # Pinned: this installs a native binary into the build, so "latest" is a
+      # dependency on whatever was published this morning.
       - name: Install curl_cffi (CineStar TLS fallback)
         continue-on-error: true
-        run: pip install --quiet curl_cffi
+        run: pip install --quiet 'curl_cffi==0.16.0'
 
       - run: npm test
 
       - run: npm run build
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-          CINEPLEXX_CLIENT_KEY: ${{ vars.CINEPLEXX_CLIENT_KEY }}
+          # Accepts either, so this keeps working whether the key is stored as a
+          # variable (as it was) or promoted to a secret.
+          CINEPLEXX_CLIENT_KEY: ${{ secrets.CINEPLEXX_CLIENT_KEY || vars.CINEPLEXX_CLIENT_KEY }}
           # A variable, not a secret: the beacon token is public by definition,
           # since it ships in the HTML of every page.
           CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}
 
-      # The last good scrape is committed so the next run can fall back to it
-      # when a cinema is down. It also keeps the scheduled workflow alive, which
-      # GitHub disables after 60 days without repository activity.
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: dist
+
+      # Handed to the persist job rather than committed here, so that the job
+      # holding `contents: write` never runs the scraper.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: raw-data
+          path: data/raw.json
+          retention-days: 1
+
+  # The last good scrape is committed so the next run can fall back to it when a
+  # cinema is down. It also keeps the scheduled workflow alive, which GitHub
+  # disables after 60 days without repository activity — so this commit is load
+  # bearing and cannot be replaced with a cache.
+  persist:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: raw-data
+          path: data
+
       - name: Commit refreshed source data
         continue-on-error: true
         run: |
@@ -63,16 +104,17 @@ jobs:
           git diff --staged --quiet || git commit -m 'chore: refresh scraped data'
           git push
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
+  # Depends on build alone, never on persist: a failed commit must not be able
+  # to hold back a good site.
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

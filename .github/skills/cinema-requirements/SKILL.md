@@ -95,12 +95,25 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
     empty state, subtitle and stale-source notices are all per city (§7b.5).
 20. **Arena exists only in Novi Sad** (§1.2.1) — its site has no location
     selector at all. Do not try to parameterize it by city.
+21. **`safeUrl()` guards every `href`/`src`, and the page has a strict CSP**
+    (§17.8–17.9). `escapeHtml` does not stop `javascript:` — there is nothing in
+    it to escape. The CSP has no `unsafe-inline`, so **adding an inline
+    `<script>` or `style=` breaks the site**; a test asserts their absence.
+22. **Fetches are deadline-bound, size-capped and redirect-capped** (§17.3–17.4),
+    and the `curl_cffi` child is SIGKILLed after 60 s (§17.5). The body is read
+    while the abort timer is still armed — moving that read outside it
+    reintroduces a build that hangs forever.
+23. **Arena URLs are origin-allow-listed** (§17.6). It is the one source fetched
+    over plaintext HTTP, so a booking chip must never be steerable off-origin.
+24. **Workflow permissions are per job** (§17.12). `build` runs the scraper with
+    no write access; `persist` commits and `deploy` publishes. `deploy` must
+    never depend on `persist` (§17.13).
 
 ## Before committing
 
 ```
 npx tsc --noEmit
-npm test          # 110 tests, fixtures only, no network
+npm test          # 122 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```

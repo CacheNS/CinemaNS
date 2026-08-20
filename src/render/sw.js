@@ -6,8 +6,19 @@
  * see — the activate handler deletes every cache whose key isn't the current
  * one, so a rename here is what evicts stale branding from existing installs.
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `kokice-${VERSION}`;
+
+/**
+ * Only a successful, same-origin response is worth storing. Without this gate a
+ * 404 or a 500 from a bad deploy gets cached and then served back offline as if
+ * it were the page, and an opaque cross-origin response would be stored blind.
+ * Redirects are excluded too: caching one under the original request URL pins a
+ * redirect that may not survive the next build.
+ */
+function isCacheable(response) {
+  return response.ok && response.type === 'basic' && !response.redirected;
+}
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -40,8 +51,10 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          if (isCacheable(response)) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
           return response;
         })
         .catch(() => caches.match(request).then((cached) => cached ?? caches.match('./index.html'))),
@@ -54,8 +67,10 @@ self.addEventListener('fetch', (event) => {
       (cached) =>
         cached ??
         fetch(request).then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          if (isCacheable(response)) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
           return response;
         }),
     ),

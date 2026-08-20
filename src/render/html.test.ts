@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { escapeHtml, renderDayPage, renderPages, runtimeBucket } from './html.js';
+import { escapeHtml, renderDayPage, renderPages, runtimeBucket, safeUrl } from './html.js';
 import { CINEMA_IDS, CITIES, DEFAULT_CITY } from '../core/types.js';
 import type { CinemaId, Snapshot, SourceStatus } from '../core/types.js';
 
@@ -288,4 +288,43 @@ test('no Cyrillic reaches the rendered page', () => {
 
 test('escapeHtml converts Cyrillic while still escaping markup', () => {
   assert.equal(escapeHtml('Хорор & <b>'), 'Horor &amp; &lt;b&gt;');
+});
+
+test('safeUrl passes ordinary links through and drops script schemes', () => {
+  assert.equal(safeUrl('https://example.test/x?a=1'), 'https://example.test/x?a=1');
+  assert.equal(safeUrl('assets/style.css'), 'assets/style.css');
+  assert.equal(safeUrl('/film/12'), '/film/12');
+  assert.equal(safeUrl('mailto:a@example.test'), 'mailto:a@example.test');
+
+  // Escaping alone never removes these: they contain no HTML metacharacter.
+  assert.equal(safeUrl('javascript:alert(1)'), undefined);
+  assert.equal(safeUrl('  JaVaScRiPt:alert(1)'), undefined);
+  assert.equal(safeUrl('data:text/html,<script>alert(1)</script>'), undefined);
+  assert.equal(safeUrl('vbscript:msgbox(1)'), undefined);
+  assert.equal(safeUrl('//evil.test/x'), undefined);
+  assert.equal(safeUrl('   '), undefined);
+});
+
+test('a poisoned booking URL falls back to the venue instead of shipping a script link', () => {
+  // A cinema site we do not control supplies every booking URL, so this is the
+  // realistic shape of the attack: valid HTML, hostile scheme.
+  const poisoned = structuredClone(snapshot);
+  poisoned.movies[0]!.showtimes[0]!.bookingUrl = 'javascript:alert(document.domain)';
+  poisoned.movies[0]!.posterUrl = 'javascript:alert(2)';
+
+  const page = renderDayPage(poisoned, '2026-08-19');
+  assert.ok(!page.includes('javascript:'), 'no javascript: URL may reach the page');
+  // The chip still points somewhere useful rather than vanishing.
+  assert.ok(page.includes('href="https://cinestarcinemas.rs/novi-sad-big"'));
+});
+
+test('the page carries a CSP that forbids inline script', () => {
+  const page = renderDayPage(snapshot, '2026-08-19');
+  assert.ok(page.includes('http-equiv="Content-Security-Policy"'));
+  assert.ok(page.includes("default-src 'none'"));
+  assert.ok(!page.includes("'unsafe-inline'"));
+  assert.ok(!page.includes("'unsafe-eval'"));
+  // The CSP is worthless if the page grows an inline script or style.
+  assert.ok(!/<script(?![^>]*\ssrc=)/.test(page), 'inline <script> would be blocked by the CSP');
+  assert.ok(!/\sstyle="/.test(page), 'inline style= would be blocked by the CSP');
 });

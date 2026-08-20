@@ -105,3 +105,109 @@ test('tlsFallback reports the original 403 when the impersonator is unavailable'
     resetInterpreterCache();
   }
 });
+
+/**
+ * A body that never ends. The stub's stream is deliberately NOT wired to the
+ * abort signal, which is the pessimistic case: it proves the read layer itself
+ * enforces the deadline rather than relying on the runtime to do it.
+ */
+function stubStalledBody(): { restore: () => void } {
+  const original = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('<html>'));
+          // ...and then nothing, ever.
+        },
+      }),
+      { status: 200 },
+    )) as unknown as typeof fetch;
+  return { restore: () => (globalThis.fetch = original) };
+}
+
+test('a stalled response body loses to the request deadline', async () => {
+  // The timeout used to be cleared the moment headers arrived, so a body that
+  // never finished hung the hourly build with nothing left to interrupt it.
+  const stub = stubStalledBody();
+  const started = Date.now();
+  try {
+    await assert.rejects(
+      () => fetchText('https://example.test/stall', { timeoutMs: 200, retries: 0 }),
+      /Isteklo vreme|aborted|abort/i,
+    );
+  } finally {
+    stub.restore();
+  }
+  assert.ok(Date.now() - started < 5000, 'must abort promptly rather than hang');
+});
+
+test('an oversized response body is abandoned rather than buffered', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response('x'.repeat(50_000), { status: 200 })) as unknown as typeof fetch;
+  try {
+    await assert.rejects(
+      () => fetchText('https://example.test/huge', { maxBytes: 1024, retries: 0 }),
+      /prelazi 1024/,
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('a declared Content-Length over the cap is rejected before the body is read', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response('short', {
+      status: 200,
+      headers: { 'content-length': '99999999' },
+    })) as unknown as typeof fetch;
+  try {
+    await assert.rejects(
+      () => fetchText('https://example.test/lying', { maxBytes: 2048, retries: 0 }),
+      /prelazi 2048/,
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('redirects are followed, but only a bounded number of times', async () => {
+  const original = globalThis.fetch;
+  let hops = 0;
+  globalThis.fetch = (async (url: string) => {
+    hops++;
+    // An endless redirect loop, which is what a hostile or broken host serves.
+    return new Response('', {
+      status: 302,
+      headers: { location: `https://example.test/${hops}` },
+    });
+  }) as unknown as typeof fetch;
+  try {
+    await assert.rejects(
+      () => fetchText('https://example.test/loop', { retries: 0 }),
+      /Previše preusmeravanja/,
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+  assert.ok(hops <= 7, `redirect chain must be bounded, took ${hops} hops`);
+});
+
+test('a redirect to a non-http scheme is refused', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response('', {
+      status: 302,
+      headers: { location: 'file:///etc/passwd' },
+    })) as unknown as typeof fetch;
+  try {
+    await assert.rejects(
+      () => fetchText('https://example.test/jump', { retries: 0 }),
+      /Nedozvoljena šema/,
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});

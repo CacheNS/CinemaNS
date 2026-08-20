@@ -1,0 +1,25 @@
+version: 2
+
+# The workflow pins actions to commit SHAs, which is safe but invisible: a
+# pinned SHA never tells you it has fallen behind. Dependabot is what turns a
+# pin back into something maintained, and it understands the `# v4` comment, so
+# it bumps both the SHA and the label together.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+    # One runtime dependency and three dev ones, so a single grouped PR a week
+    # is easier to review than four.
+    groups:
+      all:
+        patterns: ['*']

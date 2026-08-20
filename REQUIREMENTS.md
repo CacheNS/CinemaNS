@@ -634,7 +634,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **110 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **122 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same
@@ -820,3 +820,130 @@ Delete the `CF_BEACON_TOKEN` repository variable and the next build ships pages
 with no beacon and no privacy note (R-16.5) — no code change, no redeploy of
 logic. To rotate, remove the site in Cloudflare Web Analytics, add it again and
 replace the variable's value; the replacement is equally public by R-16.10.
+
+---
+
+## 17. Security posture
+
+A three-agent security review (untrusted input, browser output, CI/CD) audited
+the whole solution and found **0 critical and 0 high** issues. The requirements
+below record what was hardened as a result, and — just as importantly — what
+was examined and deliberately left alone.
+
+### The threat model this design assumes
+
+**R-17.1 The realistic attacker is an upstream cinema site, not a visitor.**
+There is no login, no database, no user input and no server: the only writable
+surface is the data three cinema sites and TMDb hand us every hour. Every
+control below follows from that. Findings that assume a conventional web app
+(session fixation, SQL injection, CSRF) do not apply and should not be
+"fixed" into existence.
+
+**R-17.2 Arena is the least-trusted source.** It is fetched over plaintext HTTP
+because `https://www.arenacineplex.com` fails the TLS handshake outright — this
+cannot be upgraded from our side. So Arena's markup is treated as attacker-
+controlled: anyone on the path can rewrite it.
+
+### Untrusted input
+
+**R-17.3 Every response is size-capped and read under the request deadline.**
+`fetchOnce` reads the body while the abort timer is still armed and streams it
+through a byte counter (8 MiB, `maxBytes`-overridable), rejecting early on an
+oversized `Content-Length`. Before this, the timeout was cleared as soon as
+headers arrived, so a body that never ended hung the hourly build with nothing
+left to interrupt it.
+
+**R-17.4 Redirects are followed manually, capped, and scheme-checked.** Five
+hops maximum, and a redirect to anything but `http`/`https` is refused — the
+fetch layer must never be steerable into `file:` by a scraped `Location`.
+
+**R-17.5 The `curl_cffi` subprocess has a deadline and output caps.** 60
+seconds, then `SIGKILL`; 8 MiB of stdout and 4 KB of stderr. A helper that
+hangs must not take the build with it. It keeps its argv-array `spawn` with no
+shell, which is what makes command injection impossible.
+
+**R-17.6 Arena URLs are resolved against an origin allow-list** — its own site
+for programme and poster links, plus the ticket host for booking links, with
+`http` upgraded to `https` on that host. Anything else is dropped. Because the
+page is fetched over plaintext, without this a MITM could point a booking chip
+at a phishing host that a reader is about to type card details into.
+
+**R-17.7 Titles are capped at 300 characters before parsing.** The noise-
+stripping regexes are quadratic — measured, not assumed: 64 KB takes ~0.7 s and
+about 1 MB takes minutes. The cap truncates rather than throwing, so one absurd
+title degrades that title instead of the scrape.
+
+### Browser output
+
+**R-17.8 Escaping is not enough for URLs; schemes are allow-listed.**
+`safeUrl()` guards every `href` and `src` on the page. `javascript:alert(1)`
+contains no character `escapeHtml` touches, so it would otherwise survive
+intact and run on click — and booking links, cinema sites, posters, trailers
+and score links all come from third parties. Only `http`, `https`, `mailto` and
+relative URLs pass; a rejected booking URL falls back to the venue programme
+(R-8.1a) rather than disappearing.
+
+**R-17.9 The page ships a Content-Security-Policy** with `default-src 'none'`
+and no `unsafe-inline`, which is possible only because the page has no inline
+script and no inline style. **Adding either would break the site**, and a test
+asserts their absence. `img-src` stays broad (`https:`) because posters come
+from several CDNs. `frame-ancestors` is absent by necessity: a meta-tag CSP
+ignores it and GitHub Pages cannot set response headers.
+
+**R-17.10 The service worker caches only successful, same-origin, non-redirected
+responses.** Otherwise a 404 from a bad deploy is stored and then served back
+offline as though it were the page. `VERSION` is bumped when this logic changes,
+which is what evicts an installed copy holding the old rules.
+
+**R-17.11 The preview server binds to loopback only.** `npm run serve` has no
+auth and is not meant to leave the machine.
+
+### Pipeline
+
+**R-17.12 No job holds a permission it does not need.** The workflow is
+`contents: read` at the top level. `build` — the only job that runs the scraper
+and therefore the only one an attacker could plausibly reach — has no write
+access at all. `persist` holds `contents: write` and does nothing but commit an
+artifact; `deploy` holds `pages: write` and `id-token: write` and does nothing
+but publish one.
+
+**R-17.13 `deploy` depends on `build` alone, never on `persist`.** A failed
+commit must not be able to hold back a good site.
+
+**R-17.14 The `data/raw.json` commit is load bearing and must not be replaced
+with a cache.** It is both the stale-data fallback (R-3.5) and the activity that
+stops GitHub disabling a `schedule:` trigger after 60 days. Cache writes do not
+count as repository activity. It moved into its own job, but it did not go away.
+
+**R-17.15 Actions are pinned to commit SHAs**, with the version in a trailing
+comment so Dependabot can bump both together. A tag can be moved to point at new
+code; a SHA cannot. `.github/dependabot.yml` is what keeps the pins from
+quietly rotting.
+
+**R-17.16 `npm ci --ignore-scripts` and an exact `curl_cffi` pin.** No package
+in the lockfile declares an install script, so refusing to run them costs
+nothing and closes the usual npm supply-chain path. `pip install curl_cffi`
+was unpinned, which made every build depend on whatever was published that
+morning.
+
+**R-17.17 Dependabot *alerts* must be enabled in repository settings.** They are
+currently off, which cannot be changed from code — `.github/dependabot.yml`
+configures update PRs, not vulnerability alerting. This is a manual toggle under
+Settings → Code security.
+
+### Examined and deliberately unchanged
+
+**R-17.18 TLS verification is intact and the impersonation does not weaken it.**
+`curl_cffi` replays a Chrome handshake *fingerprint*; there is no
+`rejectUnauthorized: false`, no `verify=False` and no `curl -k` anywhere. This
+code looks alarming by design — do not "harden" it by disabling the fallback,
+or CineStar goes dark in CI.
+
+**R-17.19 `CF_BEACON_TOKEN` in the HTML is not a leak** (R-16.10), and the
+Cloudflare beacon cannot carry Subresource Integrity because Cloudflare updates
+the file at will. The CSP is the mitigation that is actually available.
+
+**R-17.20 `data.json` is published deliberately** and contains only what the
+page already shows. `npm audit` reports zero vulnerabilities across 24 runtime
+and 3 dev packages, the lockfile is v3 with integrity hashes, and no secret
+reaches `dist/` or `data/raw.json`.

@@ -43,6 +43,8 @@ if (!existsSync(DIST)) {
   process.exit(1);
 }
 
-server.listen(PORT, () => {
+// Loopback only. This is a preview server with no auth, and binding it to every
+// interface would publish the build to whatever network the laptop is on.
+server.listen(PORT, '127.0.0.1', () => {
   console.log(`Sajt je dostupan na http://localhost:${PORT}`);
 });

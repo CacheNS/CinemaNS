@@ -6,6 +6,17 @@ import type { AdapterResult, RawMovie, Showtime } from '../core/types.js';
 
 const BASE = 'http://www.arenacineplex.com';
 
+/**
+ * Arena is the one source fetched over plaintext HTTP — its own host has no
+ * working HTTPS at all, so this cannot simply be upgraded. That makes its
+ * markup the most tamperable input we have, and the reason every URL taken
+ * from it is resolved against a known origin instead of being trusted as-is:
+ * a MITM (or a compromise of the site) could otherwise point a booking chip at
+ * an arbitrary host and phish a reader who is about to enter card details.
+ */
+const PROGRAMME_ORIGIN = 'http://www.arenacineplex.com';
+const TICKET_ORIGIN = 'https://ulaznice.arenacineplex.com';
+
 export interface ArenaListing {
   url: string;
   /** Present only for films in the home-page grid; otherwise read from the film page. */
@@ -13,17 +24,37 @@ export interface ArenaListing {
   posterUrl?: string;
 }
 
-function absolute(url: string): string {
-  return url.startsWith('http') ? url : `${BASE}${url}`;
-}
-
 /**
- * Arena's own site has no working HTTPS, but its ticket host does — and a
- * booking link is the one place it matters, since the reader is about to hand
+ * Resolves a scraped href against Arena's site and returns it only if it lands
+ * on one of the origins we expect. Anything else — an absolute link to another
+ * host, a `javascript:` URL, a malformed value — becomes null and is dropped
+ * by the caller.
+ *
+ * The ticket host is silently upgraded to HTTPS on the way through: a booking
+ * link is the one place the scheme matters, since the reader is about to hand
  * over card details from a page we serve over HTTPS.
  */
-function secureBookingUrl(url: string): string {
-  return url.replace(/^http:\/\/ulaznice\.arenacineplex\.com/i, 'https://ulaznice.arenacineplex.com');
+function arenaUrl(href: string, allowed: readonly string[]): string | null {
+  let url: URL;
+  try {
+    url = new URL(href, `${BASE}/`);
+  } catch {
+    return null;
+  }
+  if (url.protocol === 'http:' && url.host === 'ulaznice.arenacineplex.com') {
+    url.protocol = 'https:';
+  }
+  return allowed.includes(url.origin) ? url.toString() : null;
+}
+
+/** A link into Arena's own programme, or null if it points anywhere else. */
+export function arenaProgrammeUrl(href: string): string | null {
+  return arenaUrl(href, [PROGRAMME_ORIGIN]);
+}
+
+/** A booking link, which may live on either the site or the ticket host. */
+export function arenaBookingUrl(href: string): string | null {
+  return arenaUrl(href, [TICKET_ORIGIN, PROGRAMME_ORIGIN]);
 }
 
 /**
@@ -42,7 +73,8 @@ export function parseArenaListings(html: string): ArenaListing[] {
 
     const path = href.split('#')[0]!;
     if (!/\/film\/\d+/.test(path)) return;
-    const url = absolute(path);
+    const url = arenaProgrammeUrl(path);
+    if (!url) return;
 
     const listing = byUrl.get(url) ?? { url };
 
@@ -52,7 +84,10 @@ export function parseArenaListings(html: string): ArenaListing[] {
     const poster =
       anchor.find('img').first().attr('src') ??
       anchor.closest('.box-image').find('a.image-hover img').first().attr('src');
-    if (poster && !listing.posterUrl) listing.posterUrl = absolute(poster);
+    if (poster && !listing.posterUrl) {
+      const posterUrl = arenaProgrammeUrl(poster);
+      if (posterUrl) listing.posterUrl = posterUrl;
+    }
 
     byUrl.set(url, listing);
   });
@@ -186,7 +221,12 @@ export function parseArenaShowtimes(
         // screening id. Every real screening carries one (…/index/197750), so the
         // id is the signal — dropping "00:00" instead would also drop a genuine
         // midnight show, and these rows are indistinguishable by time alone.
-        if (/\/numSale\/index\/?$/i.test(href)) return;        const hall = node
+        if (/\/numSale\/index\/?$/i.test(href)) return;
+
+        const bookingUrl = arenaBookingUrl(href) ?? arenaProgrammeUrl(listing.url);
+        if (!bookingUrl) return;
+
+        const hall = node
           .find('span')
           .text()
           .replace(/\s+/g, ' ')
@@ -198,7 +238,7 @@ export function parseArenaShowtimes(
           time,
           format,
           audio,
-          bookingUrl: secureBookingUrl(href.startsWith('http') ? href : `${BASE}${href}`),
+          bookingUrl,
         };
         if (hall) showtime.hall = hall;
         if (audio === 'dubbed') showtime.languageTag = 'sinhronizovano';

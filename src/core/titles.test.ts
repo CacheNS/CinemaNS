@@ -7,6 +7,7 @@ import {
   detectFormat,
   normalizeTitle,
   similarity,
+  tidyDisplayTitle,
   toSerbianLatin,
   transliterate,
 } from './titles.js';
@@ -88,4 +89,24 @@ test('toSerbianLatin leaves Latin and punctuation untouched, and is idempotent',
   assert.equal(toSerbianLatin(latin), latin);
   const once = toSerbianLatin('Спајдермен: Нови дан');
   assert.equal(toSerbianLatin(once), once);
+});
+
+test('an absurdly long title is capped instead of stalling the build', () => {
+  // The noise-stripping regexes are quadratic in input length (measured: 64 KB
+  // takes ~0.7 s, ~1 MB takes minutes), so an upstream page could otherwise
+  // hang the hourly build with a single title.
+  const absurd = `${'('.repeat(40000)}Film 3D`;
+  const started = Date.now();
+  const cleaned = cleanTitle(absurd);
+  const display = tidyDisplayTitle(absurd);
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed < 1000, `title cleaning took ${elapsed}ms`);
+  assert.ok(cleaned.length <= 300);
+  assert.ok(display.length <= 300);
+});
+
+test('the cap is far above any real title', () => {
+  const real = 'Spider-Man: Brand New Day (3D, sinhronizovano)';
+  assert.equal(cleanTitle(real), cleanTitle(real));
+  assert.ok(cleanTitle(real).length > 0);
 });

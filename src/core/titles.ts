@@ -106,12 +106,27 @@ export function toSerbianLatin(input: string): string {
 }
 
 /**
+ * No film title is anywhere near this long — the longest in the live catalogue
+ * is well under 100 characters. The cap exists because the noise-stripping
+ * regexes below are quadratic in the input length (measured: 64 KB takes ~0.7 s,
+ * ~1 MB takes minutes), so a compromised or merely broken cinema page could
+ * stall the hourly build with one absurd title. Truncating rather than throwing
+ * keeps a bad title from taking the whole scrape down with it.
+ */
+const MAX_TITLE_LENGTH = 300;
+
+function capTitleLength(raw: string): string {
+  return raw.length > MAX_TITLE_LENGTH ? raw.slice(0, MAX_TITLE_LENGTH) : raw;
+}
+
+/**
  * Same noise stripping as {@link cleanTitle}, but it keeps hyphens and other
  * punctuation the title genuinely uses ("Spider-Man: Brand New Day"). Used for
  * titles shown to people rather than fed to search.
  */
 export function tidyDisplayTitle(raw: string): string {
-  let title = raw.replace(/\s+/g, ' ').trim();
+  let title = capTitleLength(raw).replace(/\s+/g, ' ').trim();
+
   title = title.replace(/\((?:[^)]*(?:3d|2d|imax|4dx|sinhron|titlov|ov|omu)[^)]*)\)/gi, ' ');
   for (const pattern of NOISE_PATTERNS) {
     title = title.replace(pattern, ' ');
@@ -128,7 +143,7 @@ export function tidyDisplayTitle(raw: string): string {
  * human would call the film. Used as the TMDb search term.
  */
 export function cleanTitle(raw: string): string {
-  let title = raw
+  let title = capTitleLength(raw)
     .replace(/\s+/g, ' ')
     .replace(/[_]+/g, ' ')
     .trim();
