@@ -151,7 +151,10 @@ test('a film playing only in another city starts hidden', () => {
 test('counts describe the visible city, not the whole payload', () => {
   const today = renderDayPage(snapshot, '2026-08-19');
   // Novi Sad has one film with two showtimes; Beograd's are excluded.
-  assert.ok(today.includes('data-total-movies="1"'), today.match(/data-total-movies="\d+"/)?.[0]);
+  assert.ok(
+    today.includes('data-total-movies="1"'),
+    today.match(/data-total-movies="\d+"/)?.[0] ?? 'no data-total-movies attribute rendered',
+  );
   assert.ok(today.includes('data-total-showtimes="2"'));
 });
 
