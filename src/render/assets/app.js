@@ -10,6 +10,7 @@
   // wired up before the filter elements are required.
   setupInstall();
   registerServiceWorker();
+  setupPosterFallback();
 
   if (!form || !container || !counts) return;
 
@@ -307,5 +308,24 @@
         /* offline support is optional */
       });
     });
+  }
+
+  // A dead poster link (source sites go stale) otherwise shows the browser's
+  // broken-image icon and alt text, which the hover zoom then blows up to a
+  // large size. Swap it for the same empty placeholder a missing poster gets.
+  // 'error' does not bubble, so listen on the document in the capture phase.
+  function setupPosterFallback() {
+    document.addEventListener(
+      'error',
+      function (event) {
+        var img = event.target;
+        if (!img || img.tagName !== 'IMG' || !img.classList.contains('poster')) return;
+        var placeholder = document.createElement('div');
+        placeholder.className = 'poster poster--empty';
+        placeholder.setAttribute('aria-hidden', 'true');
+        img.replaceWith(placeholder);
+      },
+      true,
+    );
   }
 })();

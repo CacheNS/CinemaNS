@@ -658,6 +658,8 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
        Analytics). Ne koriste se kolačići i ne prikupljaju se lični podaci.</p>
   </footer>
 
+  <a href="#top" class="scroll-top" aria-label="Nazad na vrh">↑</a>
+
   <script src="assets/app.js" defer></script>
 </body>
 </html>
