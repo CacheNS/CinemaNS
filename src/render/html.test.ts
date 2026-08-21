@@ -390,7 +390,7 @@ test('titles are unique per day and carry the target keywords', () => {
   const tomorrow = renderDayPage(snapshot, '2026-08-20');
   const todayTitle = /<title>([^<]*)<\/title>/.exec(today)?.[1];
   const tomorrowTitle = /<title>([^<]*)<\/title>/.exec(tomorrow)?.[1];
-  assert.ok(todayTitle?.includes('Repertoar bioskopa Novi Sad i Beograd'));
+  assert.ok(todayTitle?.includes('Repertoar bioskopa za Novi Sad i Beograd'));
   assert.notEqual(todayTitle, tomorrowTitle, 'each day page needs its own title');
 });
 

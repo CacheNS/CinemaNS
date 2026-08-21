@@ -15,7 +15,7 @@ import type { Movie, Showtime, Snapshot } from '../core/types.js';
 export const BASE_URL = 'https://kokice.org';
 
 /** The keyword-bearing base title, shared by every page and reused in `<h1>`. */
-const SITE_TITLE = 'Kokice.org — Repertoar bioskopa Novi Sad i Beograd';
+const SITE_TITLE = 'Kokice.org — Repertoar bioskopa za Novi Sad i Beograd';
 
 /**
  * Escapes for HTML, and converts any Serbian Cyrillic to Latin on the way out.
@@ -176,7 +176,8 @@ function buildStructuredData(snapshot: Snapshot, date: string): string {
   return JSON.stringify(graph).replace(/</g, '\\u003C');
 }
 
-/**
+
+/**
  * Escaping alone does not make a URL safe to put in an `href` or `src`:
  * `javascript:alert(1)` contains no character `escapeHtml` touches, so it
  * survives intact and runs on click. Every URL on this page — booking links,
@@ -592,7 +593,7 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
     ${renderCityNav()}
   </header>
 
-  <nav class="days" aria-label="Izbor dana">
+  <nav class="days" aria-label="Odabir dana">
         ${renderDayNav(days, date)}
   </nav>
 
@@ -638,11 +639,11 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
            u adresnoj traci.</p>
       </div>
     </div>
-    <p>Poslednje osvežavanje: ${escapeHtml(formatTimestamp(snapshot.generatedAt))}.
-       Podaci se osvežavaju na svakih sat vremena.</p>
-    <p>Podaci se preuzimaju sa sajtova bioskopa. Uzrasne oznake i ocene su
+    <p>Poslednje osvežavanje: ${escapeHtml(formatTimestamp(snapshot.generatedAt))}.</p>
+    <p>Podaci se preuzimaju sa sajtova bioskopa. Oznake uzrasta gledalaca i ocene su
        informativne i preuzete iz TMDb baze — proverite zvaničnu oznaku na sajtu
        bioskopa.</p>
+    <p>Postoji mogućnost da podaci nisu ispravni. Proverite pre odlaska u bioskop.</p>
     <p class="footer__privacy">Broj poseta se meri anonimno (Cloudflare Web
        Analytics). Ne koriste se kolačići i ne prikupljaju se lični podaci.</p>
   </footer>
