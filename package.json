@@ -11,6 +11,7 @@
     "compile": "tsc",
     "build": "npm run compile && node --env-file-if-exists=.env lib/build.js",
     "report": "npm run compile && node --env-file-if-exists=.env lib/report.js",
+    "alert": "npm run compile && node lib/alert.js",
     "serve": "node lib/serve.js",
     "test": "npm run compile && node --test \"lib/**/*.test.js\"",
     "typecheck": "tsc --noEmit"

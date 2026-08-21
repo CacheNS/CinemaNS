@@ -219,8 +219,10 @@ domain lands at `https://<account>.github.io/CinemaNS/` instead.
 > to be framed as a rename deferred until the domain move; the domain move
 > happened, and the answer is simply that the name stays.
 
-Every hour the workflow runs the build, commits `data/raw.json` (the last known
-good data, which also keeps the scheduled workflow alive) and deploys `dist/`.
+Every hour the workflow runs the build, commits `data/raw.json` and
+`data/health.json` (the last known good data and each source's
+consecutive-failure streak, which also keeps the scheduled workflow alive) and
+deploys `dist/`.
 
 > **The repository must be public.** GitHub Pages on private repositories
 > requires a paid plan. Also, **a fork will not work** — GitHub disables
@@ -293,6 +295,12 @@ the data may be out of date; the other cinemas carry on as normal. The build
 only fails if every source fails. Stale-data warnings are scoped to the city
 they belong to, so a Belgrade outage never worries a Novi Sad reader.
 
+If a source fails **two builds in a row**, the workflow opens a
+`source-down`-labelled GitHub issue with the error (a single failed run is
+usually transient and stays silent). It edits that issue in place on further
+failures and closes it once a run comes back clean — no extra secret or
+webhook needed, since it's the repo's own `GITHUB_TOKEN`.
+
 To check the Cineplexx API contract, if their site stops returning data:
 
 ```bash
@@ -314,5 +322,6 @@ src/core/       types, dates, HTTP, title normalization, merging, age ratings
 src/tmdb/       TMDb client (search, alternative titles, certifications)
 src/render/     HTML, CSS, client-side JS, PWA icons and manifest
 fixtures/       saved HTML/JSON for tests (no network)
-data/           raw.json (last known good data) and title-overrides.json
+data/           raw.json (last known good data), health.json (per-source
+                failure streak) and title-overrides.json
 ```

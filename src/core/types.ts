@@ -258,6 +258,8 @@ export interface SourceStatus {
   /** True when this cinema's data was carried over from an earlier build. */
   stale: boolean;
   error?: string;
+  /** How many builds in a row this source has failed; absent when it didn't fail. */
+  consecutiveFailures?: number;
 }
 
 export interface Diagnostics {

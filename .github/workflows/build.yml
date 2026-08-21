@@ -12,7 +12,7 @@ on:
 # Deliberately read-only at the top level. The build job parses HTML and JSON
 # from three cinema sites it does not control, so it is the one job an attacker
 # could plausibly reach — and it must not be able to write to the repository or
-# publish to Pages. The two jobs that need write access are separate, tiny, and
+# publish to Pages. The jobs that need write access are separate, tiny, and
 # touch no untrusted input.
 permissions:
   contents: read
@@ -27,6 +27,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # Read by the alert job below, which has no other way to learn whether
+    # this run's scrapes actually succeeded.
+    outputs:
+      degraded: ${{ steps.health.outputs.degraded }}
+      body: ${{ steps.health.outputs.body }}
     steps:
       # Actions are pinned to commit SHAs rather than floating tags: a tag can
       # be moved to point at new code, so `@v4` is a standing invitation to run
@@ -63,16 +68,29 @@ jobs:
           # variable (as it was) or promoted to a secret.
           CINEPLEXX_CLIENT_KEY: ${{ secrets.CINEPLEXX_CLIENT_KEY || vars.CINEPLEXX_CLIENT_KEY }}
 
+      # A source going stale is invisible from outside: R-11.2's fallback keeps
+      # the site looking fine to readers even while a scraper is broken. This
+      # reads dist/data.json (already compiled by `npm run build`) and hands
+      # the alert job below a plain summary, so that job never needs its own
+      # checkout or network access to the cinema sites.
+      - name: Check source health
+        id: health
+        run: node lib/alert.js
+
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist
 
       # Handed to the persist job rather than committed here, so that the job
-      # holding `contents: write` never runs the scraper.
+      # holding `contents: write` never runs the scraper. health.json tracks
+      # each source's consecutive-failure streak so the alert job below only
+      # fires on a repeat failure, never a single blip (R-11.8, R-11.9).
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: raw-data
-          path: data/raw.json
+          path: |
+            data/raw.json
+            data/health.json
           retention-days: 1
 
   # The last good scrape is committed so the next run can fall back to it when a
@@ -97,7 +115,7 @@ jobs:
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add data/raw.json
+          git add data/raw.json data/health.json
           git diff --staged --quiet || git commit -m 'chore: refresh scraped data'
           git push
 
@@ -115,3 +133,46 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+
+  # A degraded source (R-11.2's stale fallback) never fails the build and never
+  # shows up outside the site's own footer, so without this a maintainer only
+  # learns a scraper broke by noticing the UI or reading the Actions log
+  # (R-11.8). src/alert.ts only counts a source once it has failed two builds
+  # in a row (health.json), so one transient blip never opens an issue. This
+  # opens one tracking issue per outage and closes it again once a later run
+  # comes back healthy — deliberately independent of persist/deploy, so a
+  # broken alert can never hold back a good site.
+  alert:
+    needs: build
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or close the source-health issue
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEGRADED: ${{ needs.build.outputs.degraded }}
+          BODY: ${{ needs.build.outputs.body }}
+        run: |
+          set -e
+          repo='${{ github.repository }}'
+          gh label create source-down --repo "$repo" --color d73a4a \
+            --description 'A cinema source failed to refresh data' --force
+          existing=$(gh issue list --repo "$repo" --label source-down --state open \
+            --json number --jq '.[0].number // empty')
+
+          if [ "$DEGRADED" = 'true' ]; then
+            if [ -n "$existing" ]; then
+              gh issue edit "$existing" --repo "$repo" --body "$BODY"
+            else
+              gh issue create --repo "$repo" --title 'Izvor ne osvežava podatke' \
+                --label source-down --body "$BODY"
+            fi
+          elif [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$repo" \
+              --body 'Svi izvori su ponovo uspešno osvežili podatke.'
+            gh issue close "$existing" --repo "$repo"
+          fi
+

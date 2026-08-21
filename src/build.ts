@@ -20,6 +20,7 @@ export const ROOT = path.resolve(HERE, '..');
 const DATA_DIR = path.join(ROOT, 'data');
 const DIST_DIR = path.join(ROOT, 'dist');
 const RAW_CACHE = path.join(DATA_DIR, 'raw.json');
+const HEALTH_CACHE = path.join(DATA_DIR, 'health.json');
 
 interface RawCacheEntry {
   fetchedAt: string;
@@ -27,6 +28,8 @@ interface RawCacheEntry {
 }
 
 type RawCache = Partial<Record<CinemaId, RawCacheEntry>>;
+/** Consecutive failed builds per source, so a single blip doesn't page anyone (R-11.9). */
+type HealthCache = Partial<Record<CinemaId, number>>;
 
 const SCRAPERS: Record<CinemaId, (days: string[]) => Promise<{ movies: RawMovie[] }>> =
   Object.fromEntries(
@@ -99,6 +102,7 @@ function withinWindow(movies: RawMovie[], days: string[]): RawMovie[] {
 export async function build(): Promise<Snapshot> {
   const days = windowDays(8);
   const previous = await readJson<RawCache>(RAW_CACHE, {});
+  const previousHealth = await readJson<HealthCache>(HEALTH_CACHE, {});
   const now = new Date().toISOString();
 
   const settled = await Promise.all(
@@ -118,6 +122,7 @@ export async function build(): Promise<Snapshot> {
   );
 
   const rawCache: RawCache = {};
+  const health: HealthCache = {};
   const sources = {} as Record<CinemaId, SourceStatus>;
   const allMovies: RawMovie[] = [];
   let liveSources = 0;
@@ -143,6 +148,8 @@ export async function build(): Promise<Snapshot> {
     }
 
     console.error(`[${entry.cinemaId}] neuspeh: ${entry.error}`);
+    const consecutiveFailures = (previousHealth[entry.cinemaId] ?? 0) + 1;
+    health[entry.cinemaId] = consecutiveFailures;
     const fallback = previous[entry.cinemaId];
     const movies = fallback ? withinWindow(fallback.movies, days) : [];
     if (fallback) rawCache[entry.cinemaId] = fallback;
@@ -154,6 +161,7 @@ export async function build(): Promise<Snapshot> {
       showtimeCount: countShowtimes(movies),
       stale: true,
       error: entry.error,
+      consecutiveFailures,
     };
   }
 
@@ -190,6 +198,7 @@ export async function build(): Promise<Snapshot> {
 
   await mkdir(DATA_DIR, { recursive: true });
   await writeFile(RAW_CACHE, JSON.stringify(rawCache), 'utf8');
+  await writeFile(HEALTH_CACHE, JSON.stringify(health), 'utf8');
 
   return snapshot;
 }

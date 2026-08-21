@@ -114,9 +114,15 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 23. **Arena URLs are origin-allow-listed** (§17.6). It is the one source fetched
     over plaintext HTTP, so a booking chip must never be steerable off-origin.
 24. **Workflow permissions are per job** (§17.12). `build` runs the scraper with
-    no write access; `persist` commits and `deploy` publishes. `deploy` must
-    never depend on `persist` (§17.13).
-25. **Every day page is independently indexable** (§18). Canonical URL, unique
+    no write access; `persist` commits, `deploy` publishes and `alert` opens or
+    closes a GitHub issue. `deploy` must never depend on `persist` (§17.13).
+25. **A degraded source only alerts after two consecutive failures, in a
+    GitHub issue, not a webhook** (§11.9). `src/alert.ts` reads the
+    consecutive-failure streak from the committed `data/health.json` — a
+    single blip (§11.8) must not open an issue, and a cache write there would
+    silently reset the streak, so it is committed alongside `raw.json`
+    (§17.14).
+26. **Every day page is independently indexable** (§18). Canonical URL, unique
     title/description, OG/Twitter tags and a per-day, default-city-scoped
     JSON-LD graph are all built from `BASE_URL` and `snapshot`, never
     hardcoded — a future domain change or a new day in the window must not
@@ -126,7 +132,7 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 
 ```
 npx tsc --noEmit
-npm test          # 127 tests, fixtures only, no network
+npm test          # 132 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```

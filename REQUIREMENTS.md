@@ -619,6 +619,19 @@ off the caller's IP, so "it works on my machine" proves nothing about the
 runner. When a source is stale on the live site, read the Actions log for the
 adapter's `neuspeh:` line rather than re-running the build locally.
 
+**R-11.9 A source stuck on stale data alerts the maintainer, not just the
+reader.** R-11.2's fallback means a broken scraper can hide behind good cached
+data for days with only the footer's stale notice (R-11.3) to show for it.
+`src/alert.ts` tracks each source's consecutive-failure streak in the
+committed `data/health.json` (persisted alongside `raw.json`, same as R-17.14)
+and only reports a source once it has failed **two builds in a row** — a
+single transient blip (R-11.8) never fires, only a repeat does. The `build`
+job's `degraded`/`body` outputs feed a separate `alert` workflow job that opens
+a `source-down`-labelled issue from them — editing it in place on repeat
+failures, closing it once a run comes back clean. This job needs `issues:
+write` and nothing else, runs only after `build` succeeds, and never blocks
+`persist` or `deploy` if it fails itself.
+
 ---
 
 ## 12. Testing
@@ -636,7 +649,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **127 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **132 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same
@@ -975,6 +988,9 @@ commit must not be able to hold back a good site.
 with a cache.** It is both the stale-data fallback (R-3.5) and the activity that
 stops GitHub disabling a `schedule:` trigger after 60 days. Cache writes do not
 count as repository activity. It moved into its own job, but it did not go away.
+`data/health.json` (R-11.9's consecutive-failure counter) is committed in the
+same step for the same reason: a cache write would reset the streak on every
+run and the alert would never fire.
 
 **R-17.15 Actions are pinned to commit SHAs**, with the version in a trailing
 comment so Dependabot can bump both together. A tag can be moved to point at new

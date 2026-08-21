@@ -19,7 +19,7 @@ its old name deliberately (R-13.8).
 ## Commands
 
 ```
-npm test          # 127 tests, fixtures only, no network
+npm test          # 132 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -138,10 +138,16 @@ what a well-meaning change could undo:
   plaintext HTTP and cannot be upgraded.
 - **Titles are capped at 300 chars** before the quadratic regexes (R-17.7).
 - **Workflow permissions are per job** (R-17.12): `build` runs the scraper with
-  no write access; `persist` and `deploy` hold one permission each. `deploy`
-  must never depend on `persist` (R-17.13).
+  no write access; `persist`, `deploy` and `alert` each hold one permission.
+  `deploy` must never depend on `persist` (R-17.13).
 - **The `data/raw.json` commit is load bearing** (R-17.14) — it is also what
   stops GitHub disabling the hourly schedule. Do not replace it with a cache.
+  `data/health.json` rides in the same commit: it is the consecutive-failure
+  counter behind R-11.9's alerting, and a cache write would silently reset it.
+- **A degraded source only alerts after two consecutive failures** (R-11.9),
+  via a `source-down`-labelled GitHub issue that `alert` opens/edits/closes —
+  not a Slack/webhook or any new secret. Don't lower the threshold to one
+  build; that is the single-blip noise it exists to avoid (R-11.8).
 - **Actions are SHA-pinned and `npm ci` runs `--ignore-scripts`** (R-17.15–16).
 - **TLS verification is intact** (R-17.18). The impersonation replays a Chrome
   handshake fingerprint and nothing more — do not "fix" it away.
