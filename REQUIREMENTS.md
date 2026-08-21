@@ -634,7 +634,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **122 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **119 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same
@@ -660,7 +660,6 @@ workflows are auto-disabled after 60 days of inactivity.
 readable by anyone who can see the repo and is exposed in logs);
 `CINEPLEXX_CLIENT_KEY` is a variable with a known default (it is a public value
 from their web bundle, so it must be overridable without a rebuild).
-`CF_BEACON_TOKEN` is likewise a **variable**, for the reasons in R-16.4.
 
 **R-13.4a** `TMDB_API_KEY` must be TMDb's **API Key (v3 auth)** — the 32-char
 hex string. The client authenticates with `?api_key=`, so the v4 "API Read
@@ -680,20 +679,57 @@ the hourly refresh (R-2.1). To move the project between accounts, use
 *Settings → Transfer ownership*, which keeps history and redirects the old URL.
 
 **R-13.8 The app is named "Kokice"; the repository is deliberately NOT
-renamed.** `CacheNS/CinemaNS` drives the live URL `cachens.github.io/CinemaNS/`.
-Renaming the repository would break every existing bookmark and shared link,
-orphan installed PWA copies (the service-worker scope and `start_url` are
-origin-relative, so installs are abandoned rather than updated), and reset the
-Cloudflare Analytics hostname and its visit history. All of that cost buys
-nothing while `kokice.org` is not owned — the URL still would not be the real
-one. **The repository rename belongs with the domain move, as a single
-cutover.** Internal identifiers (`kokice`, `KOKICE_DISABLE_IMPERSONATE`) are
-renamed because they are invisible to users and cost nothing.
+renamed.** Once `kokice.org` is the address bar, `CacheNS/CinemaNS` is internal
+plumbing that no visitor ever sees, so renaming it would rewrite every remote,
+badge and cross-reference for no user-facing gain — while breaking existing
+links, orphaning installed PWA copies (the service-worker scope and `start_url`
+are origin-relative, so installs are abandoned rather than updated) and
+resetting the analytics hostname. This was previously framed as a rename
+*deferred until the domain move*; the domain move happened and the decision is
+now simply to keep the name. Internal identifiers (`kokice`,
+`KOKICE_DISABLE_IMPERSONATE`) are renamed because they are invisible to users
+and cost nothing.
 
 **R-13.9** Renaming the app requires bumping the service-worker cache key
 (`kokice-v2`). `sw.js` caches `index.html`, so without a bump installed users
 keep seeing the old name; the `activate` handler already evicts any key that is
-not current.
+not current. The same applies to an origin change: moving to `kokice.org` is a
+new origin, and the cache key was bumped again for it.
+
+**R-13.10 The canonical host is the bare apex `kokice.org`**, with
+`www.kokice.org` redirecting to it. The redirect is GitHub's — `www` is a
+`CNAME` to `cachens.github.io`, and GitHub issues the 301 — rather than a
+Cloudflare redirect rule, which would be one more thing to own for a marginal
+gain. `cachens.github.io/CinemaNS/` keeps working; GitHub redirects it to the
+custom domain automatically.
+
+**R-13.11 The domain is proxied through Cloudflare, and the ordering of that
+setup is not optional.** DNS is Cloudflare's (nameservers moved from GoDaddy,
+which remains only the registrar) and the records are orange-clouded, which is
+what makes edge-injected analytics possible (R-16.3).
+
+Three rules follow, each of which has a silent failure mode:
+
+- **Cut over DNS-only, then go proxied.** GitHub provisions the Let's Encrypt
+  certificate itself and the proxy can interfere with the HTTP-01 validation
+  that issues it. Records stay grey until the certificate exists and *Enforce
+  HTTPS* is ticked, and only then go orange.
+- **SSL/TLS mode must be Full (strict), never Flexible.** Flexible terminates
+  TLS at Cloudflare and speaks plain HTTP to the origin; GitHub Pages redirects
+  that back to HTTPS, giving an infinite redirect loop.
+- **Leave Bot Fight Mode, Under Attack mode, Cache Everything, APO and Always
+  Online off.** The first two can block the ACME challenge — and on the free
+  plan Bot Fight Mode cannot be excepted for a path — which breaks certificate
+  *renewal* roughly every 90 days, long after any deploy. The rest cache HTML
+  harder than the hourly rebuild allows; GitHub Pages already sends
+  `Cache-Control: max-age=600`, which Cloudflare honours. If renewal ever does
+  fail, the remedy is to set the records to DNS-only for an hour and flip back.
+
+**R-13.12 No `CNAME` file, ever.** Deployment is artifact-based
+(`upload-pages-artifact` → `deploy-pages`), and for that path the custom domain
+is stored in repository settings and survives every deploy. Adding a `CNAME`
+file is the branch-based-Pages instruction, and it is the thing a well-meaning
+reader of GitHub's docs will try to add.
 
 ---
 
@@ -708,14 +744,13 @@ title-matching mode. See R-13.4a for which key type to use.
 title, because there is no second source to outrank Arena. Accepted; no reliable
 heuristic was found.
 
-**R-14.3 DONE — published.** Live at <https://cachens.github.io/CinemaNS/>,
-built and deployed by GitHub Actions from `main`. Pages source is set to
-GitHub Actions, all nine scrapers report `ok`, and the hourly workflow's
-data-refresh commit is confirmed working. The URL keeps the old repository name
-by design — see R-13.8.
+**R-14.3 DONE — published.** Live at <https://kokice.org>, built and deployed by
+GitHub Actions from `main`. Pages source is set to GitHub Actions, all nine
+scrapers report `ok`, and the hourly workflow's data-refresh commit is confirmed
+working. The repository keeps its old name by design — see R-13.8.
 
-**R-14.4 DONE — analytics enabled.** `CF_BEACON_TOKEN` is set as a repository
-variable and the beacon is confirmed present in the deployed HTML. See §16.
+**R-14.4 DONE — analytics enabled.** Cloudflare Web Analytics runs in automatic
+mode, injected at the edge; the build carries no beacon and no token. See §16.
 
 **R-14.5 OPEN — no Serbian trailers exist on TMDb.** Measured 2026-08-19 across
 33 films: `sr` count was zero, so posters open Croatian or English trailers
@@ -770,56 +805,65 @@ factor: a consent dialog on a page whose whole purpose is to answer a question
 in two seconds would cost more than the numbers are worth. Google Analytics was
 rejected for exactly this reason.
 
-**R-16.3 The beacon tag must mirror Cloudflare's issued snippet**, including
-`type="module"`. `beacon.min.js` is served as an ES module, so emitting it as a
-classic `defer` script risks a parse-time failure. A module script is deferred
-by default, so this still never blocks rendering (R-2.2). Do not hand-tune the
-tag.
+**R-16.3 The beacon is injected by Cloudflare at the edge, not by the build.**
+`kokice.org` is proxied through Cloudflare (R-13.9), which lets Web Analytics
+run in *automatic* mode: Cloudflare adds the `beacon.min.js` tag to the HTML on
+the way out. The build emits no beacon, holds no site token and has no
+analytics code — the whole of `src/render/analytics.ts` and its tests were
+deleted when this moved to the edge.
 
-**R-16.4 The site tag lives in a repository *variable*, never a secret.** The
-token is embedded in the HTML of every page and is readable with View Source, so
-a secret would imply a confidentiality that does not exist — and GitHub's log
-masking would make a build that silently skipped analytics harder to diagnose.
-The workflow passes `CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}`.
+**R-16.4 The build must never also emit a beacon.** Automatic injection plus a
+tag in the built HTML means both fire and every visit is counted twice. A test
+in `html.test.ts` asserts the rendered page contains no `beacon.min.js` and no
+`data-cf-beacon`.
 
-**R-16.5 Analytics is optional and off by default.** With no token the build
-emits no beacon, no analytics request and no footer privacy note, and succeeds
-normally — the same rule TMDb follows (R-5.3). Deleting the variable is
-therefore a complete off switch requiring no code change.
+**R-16.5 The CSP allowances for `cloudflareinsights.com` are load bearing and
+must not be removed** — this is the sharp edge of edge injection. Nothing in
+the repository references those hosts any more, so
+`script-src https://static.cloudflareinsights.com` and
+`connect-src https://cloudflareinsights.com` read like dead configuration.
+Deleting them breaks nothing visible: the build succeeds, no other test fails,
+and the dashboard still says analytics is enabled. It simply records nothing,
+because `default-src 'none'` blocks the injected script. `html.test.ts` pins
+both directives with an explanatory failure message.
 
-**R-16.6 A malformed token is skipped with a warning, not rendered.** The value
-is pasted by hand; a mistyped token that still rendered would look like working
-analytics while recording nothing. Only 32 hexadecimal characters are accepted,
-which also prevents the value breaking out of the attribute it sits in.
+**R-16.6 Analytics depends on the hostname staying proxied.** Automatic
+injection is only available for a proxied (orange-cloud) record, since
+Cloudflare has to be in the response path to modify the HTML. Setting the
+record to DNS-only silently stops measurement. This matters because
+grey-clouding for an hour is the standard remedy for a failed Let's Encrypt
+renewal behind the proxy (R-13.11) — so the fix for a certificate problem also
+pauses analytics until the record goes orange again.
 
-**R-16.7 The footer states that counting happens**, in Serbian, and only when
-analytics is actually enabled — the site must not claim to measure something it
-is not measuring.
+**R-16.7 An origin `Cache-Control` containing `no-transform` disables
+injection.** Cloudflare will not rewrite a response that forbids
+transformation. GitHub Pages does not send it today; if the beacon ever
+vanishes from the served page while the dashboard shows the site as enabled,
+check the response headers before anything else.
 
-**R-16.8 The token is not hardcoded**, so that a fork does not silently report
-its visitors to this project's Cloudflare account.
+**R-16.8 The footer states that counting happens**, in Serbian, and
+unconditionally — the beacon is now a property of the live origin rather than
+of the build, so the build cannot know whether it is present and a conditional
+note would be guessing.
 
 **R-16.9 Figures are a floor, not a census.** Ad blockers, privacy browsers and
 corporate DNS filtering suppress the beacon — `static.cloudflareinsights.com`
 does not even resolve on some networks. The hourly CI build never executes it,
 so automation cannot inflate the count.
 
-**R-16.10 The site tag is visible to every visitor, and that is inherent.** It
-is delivered in the page HTML because the *visitor's browser* is what reports
-the page view; there is no configuration in which it stays private and
-analytics still works. Do not treat a future sighting of it in the HTML as a
-leak, and do not "fix" it by moving it to a GitHub secret — that hides it in CI
-logs and repository settings while leaving it just as visible on the site,
-which is worse than honest.
+**R-16.10 A site tag in the HTML is not a leak, whoever put it there.** The tag
+is delivered in the page because the *visitor's browser* is what reports the
+page view; there is no configuration in which it stays private and analytics
+still works. It now arrives from Cloudflare rather than from the build, but the
+principle is unchanged: do not treat a sighting of it as a leak, and do not try
+to hide it. What it does *not* permit is access to the Cloudflare account or to
+the analytics data; the only abuse available is submitting fake page views.
 
-What it does *not* permit: access to the Cloudflare account, or reading the
-analytics data. The only abuse available is submitting fake page views.
-
-**R-16.11 Turning it off or rotating it must stay a one-step operation.**
-Delete the `CF_BEACON_TOKEN` repository variable and the next build ships pages
-with no beacon and no privacy note (R-16.5) — no code change, no redeploy of
-logic. To rotate, remove the site in Cloudflare Web Analytics, add it again and
-replace the variable's value; the replacement is equally public by R-16.10.
+**R-16.11 Turning it off stays a one-step operation.** Disable or delete the
+site in Cloudflare Web Analytics. No code change, no redeploy. There is no
+longer a repository variable to remove — `CF_BEACON_TOKEN` was deleted from the
+workflow when injection moved to the edge, and the corresponding repository
+variable can be deleted in settings.
 
 ---
 
@@ -951,9 +995,13 @@ same file. `deploy-pages` stays at v4 because that is still current.
 code looks alarming by design — do not "harden" it by disabling the fallback,
 or CineStar goes dark in CI.
 
-**R-17.19 `CF_BEACON_TOKEN` in the HTML is not a leak** (R-16.10), and the
-Cloudflare beacon cannot carry Subresource Integrity because Cloudflare updates
-the file at will. The CSP is the mitigation that is actually available.
+**R-17.19 A Cloudflare site tag in the HTML is not a leak** (R-16.10). The
+beacon now arrives by edge injection rather than from the build, so there is no
+token in the repository at all — but it is still visible in the served page, by
+design. It cannot carry Subresource Integrity either, because Cloudflare
+updates the file at will. The CSP is the mitigation that is actually available,
+which is another reason its `cloudflareinsights.com` entries must stay
+(R-16.5).
 
 **R-17.20 `data.json` is published deliberately** and contains only what the
 page already shows. `npm audit` reports zero vulnerabilities across 24 runtime

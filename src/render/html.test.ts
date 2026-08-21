@@ -331,3 +331,29 @@ test('the page carries a CSP that forbids inline script', () => {
   assert.ok(!/<script(?![^>]*\ssrc=)/.test(page), 'inline <script> would be blocked by the CSP');
   assert.ok(!/\sstyle="/.test(page), 'inline style= would be blocked by the CSP');
 });
+
+test('the CSP keeps allowing the edge-injected analytics beacon', () => {
+  // Cloudflare injects beacon.min.js into the HTML at its edge, so nothing in
+  // this repository references these hosts and the allowances read as dead
+  // config. Removing them does not break a test elsewhere or fail the build —
+  // it just leaves Web Analytics enabled in the dashboard and counting nothing,
+  // because default-src 'none' blocks the injected script. Hence this test.
+  const page = renderDayPage(snapshot, '2026-08-19');
+  const csp = /content="([^"]*Content-Security|[^"]*default-src[^"]*)"/.exec(page)?.[1] ?? page;
+  assert.ok(
+    /script-src[^;]*https:\/\/static\.cloudflareinsights\.com/.test(csp),
+    'script-src must allow static.cloudflareinsights.com or the edge-injected beacon is blocked',
+  );
+  assert.ok(
+    /connect-src[^;]*https:\/\/cloudflareinsights\.com/.test(csp),
+    'connect-src must allow cloudflareinsights.com or the beacon cannot report the page view',
+  );
+});
+
+test('no analytics beacon is built into the page', () => {
+  // The beacon is the edge's job now. A tag here as well would double-count
+  // every visit.
+  const page = renderDayPage(snapshot, '2026-08-19');
+  assert.ok(!page.includes('beacon.min.js'), 'the beacon must come from the edge, not the build');
+  assert.ok(!page.includes('data-cf-beacon'));
+});

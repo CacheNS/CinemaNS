@@ -32,7 +32,7 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 | PWA | `src/render/icon.ts`, `sw.js` | §9 |
 | Build/deploy | `src/build.ts`, `.github/workflows/build.yml` | §3, §13 |
 | Trailers | `src/core/trailer.ts`, `src/tmdb/client.ts` | §8.10–8.11 |
-| Analytics | `src/render/analytics.ts` | §16 |
+| Analytics | Cloudflare edge injection (no repo code) | §16 |
 
 ## The rules most likely to be broken by a well-meaning change
 
@@ -71,10 +71,13 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 14. **The trailer language order (sr → sh/hr/bs → en) is already correct.** TMDb
     held zero `sr` trailers across 33 films, so Croatian ones are a legitimate
     fallback, not a bug. Check the build's `Trejleri:` line first (§8.10).
-15. **`CF_BEACON_TOKEN` is public by design and that is not a leak** (§16.10).
-    It ships in the HTML because the visitor's browser reports the page view.
-    Keep it a repository *variable*; a secret would hide it from logs while
-    leaving it just as visible on the site. Keep the beacon `type="module"`.
+15. **The analytics beacon is injected by Cloudflare at the edge, not built**
+    (§16.3). `kokice.org` is proxied, so there is no token and no analytics code
+    in the repository. Don't add a beacon tag back — it would double-count
+    (§16.4) — and **don't remove the `cloudflareinsights.com` entries from the
+    `CSP` const**, which now look like dead allowances but are what lets the
+    injected script run at all (§16.5). A site tag visible in the served HTML is
+    by design, not a leak.
 16. **Serbian Latin only, never Cyrillic** (§8.12). TMDb's `sr-RS` responses are
     Cyrillic and are converted at the TMDb boundary, with `escapeHtml` as a
     second net. Use `toSerbianLatin()` for display; `transliterate()` folds
@@ -113,7 +116,7 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 
 ```
 npx tsc --noEmit
-npm test          # 122 tests, fixtures only, no network
+npm test          # 119 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```
@@ -134,14 +137,17 @@ parser was broken against the live page (§12.3).
 
 - `TMDB_API_KEY` is configured as a repository secret; age ratings, scores and
   cross-language matching are active (§14.1).
-- The site is deployed and live at <https://cachens.github.io/CinemaNS/>,
-  built and pushed hourly by Actions (§14.3).
-- Cloudflare Web Analytics is enabled via the `CF_BEACON_TOKEN` variable (§16).
+- The site is deployed and live at <https://kokice.org>, built and pushed hourly
+  by Actions (§14.3). DNS is Cloudflare's and the records are **proxied**;
+  GoDaddy is only the registrar. There is deliberately **no `CNAME` file** —
+  artifact-based Pages keeps the custom domain in repository settings (§13.12).
+- Cloudflare Web Analytics is enabled in **automatic** mode and injected at the
+  edge; there is no token and no analytics code to find (§16.3).
 - **The repository is deliberately still named `CinemaNS` even though the app is
-  called Kokice** (§13.8). Renaming it would change the Pages URL, break
-  bookmarks, orphan installed PWA copies and reset the analytics history — for a
-  URL that still would not be `kokice.org`. The rename waits for the domain move
-  and happens once.
+  called Kokice** (§13.8). With a custom domain the slug is internal plumbing no
+  visitor sees, so renaming it would churn every remote, badge and reference for
+  nothing. This used to read "the rename waits for the domain move" — the domain
+  move happened, and the name stays.
 - **Cross-venue inconsistency about past screenings is fixed on our side**
   (§7c), because it is upstream policy: measured at 23:17, Cineplexx had pruned
   to the next screening, CineStar still listed 16:00, and Arena had dropped the

@@ -62,9 +62,6 @@ jobs:
           # Accepts either, so this keeps working whether the key is stored as a
           # variable (as it was) or promoted to a secret.
           CINEPLEXX_CLIENT_KEY: ${{ secrets.CINEPLEXX_CLIENT_KEY || vars.CINEPLEXX_CLIENT_KEY }}
-          # A variable, not a secret: the beacon token is public by definition,
-          # since it ships in the HTML of every page.
-          CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

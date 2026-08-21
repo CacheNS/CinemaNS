@@ -83,17 +83,22 @@ These look like trivia, but each one was a real bug. See §10 of
 - Cloudflare Web Analytics, kept specifically because it is **cookieless** —
   that is what spares the site a consent banner. Don't swap in anything that
   stores an id on the device.
-- The beacon must keep `type="module"`, mirroring Cloudflare's own snippet:
-  `beacon.min.js` is an ES module, so a classic `defer` script risks failing at
-  parse time. Modules defer by default, so rendering is still unblocked.
-- `CF_BEACON_TOKEN` is a repository **variable** and is visible in the published
-  HTML **by design** — the visitor's browser reports the view. That is not a
-  leak, and making it a secret would only hide it from logs, not from the page.
-- No token ⇒ no beacon and no footer note, build unaffected. That's the off switch.
+- **The beacon is injected by Cloudflare at the edge, not by the build.** The
+  domain is proxied, so there is no token, no variable and no analytics code in
+  this repository. Don't add a beacon tag back — it would double-count.
+- **Don't remove `cloudflareinsights.com` from the `CSP` const in `html.ts`.**
+  Nothing here references those hosts any more, so the two allowances look
+  dead. They aren't: deleting them leaves analytics enabled in the dashboard and
+  silently counting nothing, because `default-src 'none'` blocks the injected
+  script. A test in `html.test.ts` pins both directives.
+- A site tag visible in the served HTML is **by design**, not a leak — the
+  visitor's browser is what reports the view.
+- Analytics dies if a DNS record is set to DNS-only, which is also the standard
+  remedy for a failed certificate renewal behind the proxy (§13).
 
 ## Working in this repo
 
-- `npm test` (122 tests, no network — fixtures only) and `npx tsc --noEmit` must
+- `npm test` (119 tests, no network — fixtures only) and `npx tsc --noEmit` must
   both pass before committing.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.

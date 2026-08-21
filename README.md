@@ -1,6 +1,6 @@
 # Kokice
 
-**Live: <https://cachens.github.io/CinemaNS/>**
+**Live: <https://kokice.org>**
 
 > **Changing anything in this repository?** Read
 > [`REQUIREMENTS.md`](REQUIREMENTS.md) first — it is the project's baseline
@@ -176,19 +176,19 @@ Then configure the repository once:
 2. **Settings → Secrets and variables → Actions**
    - secret `TMDB_API_KEY` — without it there are no age ratings or scores
    - (optional) variable `CINEPLEXX_CLIENT_KEY`
-   - (optional) variable `CF_BEACON_TOKEN` — see *Visit counting* below
 3. **Actions → Build and deploy → Run workflow** for the first build, or wait
    for the next full hour.
 
-The site will be at `https://<account>.github.io/CinemaNS/`.
+The site is served from **<https://kokice.org>**. A fresh fork with no custom
+domain lands at `https://<account>.github.io/CinemaNS/` instead.
 
-> **Why is the URL still `CinemaNS` when the app is called Kokice?** Renaming
-> the repository would change the published URL, breaking existing bookmarks and
-> links, orphaning installed PWA copies (their scope and `start_url` are
-> origin-relative) and resetting the analytics history — for a URL that still
-> would not be the real one, since `kokice.org` is not registered yet. The
-> rename is deliberately deferred so it can happen once, together with the
-> domain move.
+> **Why is the repository still called `CinemaNS` when the app is Kokice?**
+> Because with a custom domain the repository slug is internal plumbing that no
+> visitor ever sees. Renaming it would rewrite every remote, badge and
+> cross-reference, break existing links and orphan installed PWA copies (their
+> scope and `start_url` are origin-relative) for no user-facing gain. This used
+> to be framed as a rename deferred until the domain move; the domain move
+> happened, and the answer is simply that the name stays.
 
 Every hour the workflow runs the build, commits `data/raw.json` (the last known
 good data, which also keeps the scheduled workflow alive) and deploys `dist/`.
@@ -199,6 +199,27 @@ good data, which also keeps the scheduled workflow alive) and deploys `dist/`.
 > refresh. If the project needs to change owner, use Settings → Transfer
 > ownership rather than forking: the history is kept and the old URL redirects.
 
+## Hosting and DNS
+
+`kokice.org` is registered at GoDaddy, but its DNS is Cloudflare's and the
+records are **proxied** (orange cloud), pointing at GitHub Pages. Three things
+about that setup are easy to get wrong and fail quietly:
+
+- **Set the records up DNS-only first, and only go proxied once GitHub has
+  issued the certificate** and *Enforce HTTPS* is ticked. The proxy can
+  interfere with the validation that issues it.
+- **SSL/TLS mode must be Full (strict).** Flexible speaks plain HTTP to the
+  origin, GitHub redirects it back to HTTPS, and the result is a redirect loop.
+- **Leave Bot Fight Mode, Under Attack mode, Cache Everything, APO and Always
+  Online off.** The first two can block the ACME challenge and break certificate
+  *renewal* months later; the rest cache HTML harder than an hourly rebuild
+  allows.
+
+There is deliberately **no `CNAME` file** in the repository: deployment is
+artifact-based, so the custom domain lives in repository settings and survives
+every deploy. Adding one is the branch-based-Pages instruction and does not
+apply here.
+
 ## Visit counting
 
 GitHub Pages keeps no access logs and offers no analytics API, and the
@@ -208,34 +229,32 @@ visitor's own browser.
 
 The site uses **Cloudflare Web Analytics**, chosen because it is cookieless: it
 stores nothing on the device and does not fingerprint, so the site needs no
-consent banner. To enable it:
+consent banner.
 
-1. Cloudflare dashboard → **Web Analytics** → **Add a site** (this is an
-   account-level page — *not* the "Add a site" on the dashboard home, which is
-   domain onboarding and would ask you to move your nameservers).
-2. Enter the hostname `<account>.github.io`, click the suggestion that appears,
-   then **Done**.
-3. From **Manage site**, copy the 32-character token out of
-   `data-cf-beacon='{"token":"…"}'`.
-4. Add it as the repository **variable** `CF_BEACON_TOKEN`.
+Because the domain is proxied through Cloudflare, analytics runs in
+**automatic** mode: Cloudflare injects the beacon into the HTML at its edge.
+There is nothing to configure in this repository — no token, no variable, no
+code. Enable it at *Cloudflare dashboard → Web Analytics → Add a site →
+`kokice.org` → automatic setup*, and turn it off by deleting the site there.
 
-Leave the variable unset and no beacon is emitted at all — no analytics
-request, no footer note, build unaffected. Deleting it later is a complete off
-switch requiring no code change.
+> **Do not also add the beacon to the page.** Automatic injection plus a tag in
+> the built HTML means both fire and every visit is counted twice. A test
+> asserts the built page contains no beacon.
 
-> **The token is public, and that is by design.** It is delivered in the HTML of
-> every page, because the visitor's browser is what reports the page view. There
-> is no configuration in which it stays private and analytics still works, which
-> is why it is a repository *variable* and not a secret. It grants no access to
-> the Cloudflare account and cannot be used to read the statistics; the only
-> abuse available is submitting fake page views.
+> **Do not remove `cloudflareinsights.com` from the CSP in
+> `src/render/html.ts`.** Nothing in this repository references those hosts any
+> more, so the two allowances look like dead configuration — they are not.
+> Deleting them leaves analytics switched on in the dashboard and silently
+> recording nothing, because `default-src 'none'` blocks the injected script.
 
-Two caveats on the numbers. Cloudflare keys on hostname and the free plan has no
-path rules for sites it does not proxy, so it records everything under
-`<account>.github.io` — filter by path `/CinemaNS/` in the dashboard. And treat
-the totals as a floor rather than a census: ad blockers, privacy browsers and
-some corporate DNS suppress the beacon entirely. The hourly build never executes
-it, so automation cannot inflate the count.
+Analytics also stops if a DNS record is ever set back to DNS-only, since
+Cloudflare then has no way to inject anything. That is worth remembering,
+because grey-clouding for an hour is the standard remedy for a failed
+certificate renewal.
+
+Treat the totals as a floor rather than a census: ad blockers, privacy browsers
+and some corporate DNS suppress the beacon entirely. The hourly build never
+executes it, so automation cannot inflate the count.
 
 ## When something breaks
 

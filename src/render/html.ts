@@ -1,5 +1,4 @@
 import { formatDayLabel, formatDayShort, formatTimestamp } from '../core/dates.js';
-import { analyticsSnippet } from './analytics.js';
 import { trailerLink } from '../core/trailer.js';
 import { toSerbianLatin } from '../core/titles.js';
 import { CINEMAS, CITIES, DEFAULT_CITY, cityById } from '../core/types.js';
@@ -24,17 +23,24 @@ export function escapeHtml(value: string): string {
 }
 
 /**
- * Defence in depth behind `escapeHtml`/{@link safeUrl}, not instead of them:
- * this page is assembled from three cinema sites plus TMDb, so if an escaping
- * gap ever slips through, the CSP is what stops it becoming script execution.
+ * Content Security Policy for every rendered page. Defence in depth behind
+ * `escapeHtml`/{@link safeUrl}, not instead of them: this page is assembled
+ * from three cinema sites plus TMDb, so if an escaping gap ever slips through,
+ * the CSP is what stops it becoming script execution.
  *
  * It can be this strict because the page has no inline script and no inline
- * style — the only third party is the Cloudflare beacon, which also needs
- * `connect-src` to report the page view. `img-src https:` stays deliberately
- * broad, since posters arrive from several CDNs, but it still refuses
- * `javascript:` and `data:` script vectors. `frame-ancestors` is omitted
- * because a meta-tag CSP ignores it; that one needs a real response header,
- * which GitHub Pages does not let us set.
+ * style. `img-src https:` stays deliberately broad, since posters arrive from
+ * several CDNs, but it still refuses `javascript:` and `data:` script vectors.
+ * `frame-ancestors` is omitted because a meta-tag CSP ignores it; that one
+ * needs a real response header, which GitHub Pages does not let us set.
+ *
+ * DO NOT REMOVE THE `cloudflareinsights.com` ENTRIES. Nothing in this
+ * repository references those hosts any more, so they look like dead
+ * allowances — they are not. Cloudflare injects the Web Analytics beacon into
+ * the HTML at the edge, which needs `script-src` for `beacon.min.js` and
+ * `connect-src` for the page-view it reports. Dropping them leaves analytics
+ * switched on in the dashboard and silently counting nothing. `html.test.ts`
+ * pins this.
  */
 const CSP = [
   "default-src 'none'",
@@ -486,16 +492,11 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
     <p>Podaci se preuzimaju sa sajtova bioskopa. Uzrasne oznake i ocene su
        informativne i preuzete iz TMDb baze — proverite zvaničnu oznaku na sajtu
        bioskopa.</p>
-    ${
-      process.env['CF_BEACON_TOKEN']?.trim()
-        ? `<p class="footer__privacy">Broj poseta se meri anonimno (Cloudflare Web
-       Analytics). Ne koriste se kolačići i ne prikupljaju se lični podaci.</p>`
-        : ''
-    }
+    <p class="footer__privacy">Broj poseta se meri anonimno (Cloudflare Web
+       Analytics). Ne koriste se kolačići i ne prikupljaju se lični podaci.</p>
   </footer>
 
   <script src="assets/app.js" defer></script>
-  ${analyticsSnippet(process.env['CF_BEACON_TOKEN'])}
 </body>
 </html>
 `;

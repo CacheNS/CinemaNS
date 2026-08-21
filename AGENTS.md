@@ -19,7 +19,7 @@ its old name deliberately (R-13.8).
 ## Commands
 
 ```
-npm test          # 122 tests, fixtures only, no network
+npm test          # 119 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -94,15 +94,21 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
 - Cloudflare Web Analytics, chosen because it is **cookieless** — that is what
   keeps the site free of a consent banner. Do not replace it with anything that
   stores an id on the device.
-- The beacon tag must mirror Cloudflare's issued snippet, including
-  `type="module"`. `beacon.min.js` is an ES module; a classic `defer` script
-  risks a parse-time failure. Modules are deferred by default, so nothing blocks.
-- `CF_BEACON_TOKEN` is a repository **variable**, not a secret, and appears in
-  the published HTML by design — the visitor's browser is what reports the view.
-  **That is not a leak.** Moving it to a secret would hide it in logs while
-  leaving it just as visible on the site. It grants no account access; the only
-  abuse is faking page views.
-- No token ⇒ no beacon, no footer note, build unaffected. That is the off switch.
+- **The beacon is injected by Cloudflare at the edge, not by the build** (§16.3).
+  `kokice.org` is proxied, so the repository holds no token, no variable and no
+  analytics code. Do not add a beacon tag back: with edge injection already
+  running, a tag in the built HTML double-counts every visit (§16.4).
+- **Do not remove the `cloudflareinsights.com` entries from the `CSP` const in
+  `html.ts`** (§16.5). Nothing in the repository references those hosts any
+  more, so they look like dead allowances. Deleting them breaks nothing
+  visibly — the build passes and the dashboard still says enabled — while
+  `default-src 'none'` silently blocks the injected script and the count stays
+  at zero. `html.test.ts` pins both directives.
+- A site tag visible in the served HTML is **by design**, not a leak: the
+  visitor's browser is what reports the view. It grants no account access; the
+  only abuse is faking page views.
+- Analytics stops if a record is set to DNS-only — which is also the standard
+  remedy for a failed certificate renewal behind the proxy (§13.11).
 
 ## Conventions
 
