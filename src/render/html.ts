@@ -195,8 +195,18 @@ function buildStructuredData(snapshot: Snapshot, date: string): string {
  * `isSafeUrl` directly, or `&` would come out as the literal text `&amp;`
  * inside a `<script>` element's raw, non-HTML-entity-decoded text.
  */
+/**
+ * A URL parser strips tab, LF and CR from anywhere in the string before
+ * looking at the scheme — that's WHATWG URL Standard behaviour, not a bug —
+ * so `"jav\tascript:alert(1)"` still runs on click even though it never
+ * matches a scheme regex applied to the raw string. Stripping the same three
+ * characters first means the checks below see exactly what a browser will
+ * actually navigate to.
+ */
+const URL_STRIP_CHARS = /[\t\n\r]/g;
+
 function isSafeUrl(value: string): string | undefined {
-  const trimmed = value.trim();
+  const trimmed = value.trim().replace(URL_STRIP_CHARS, '');
   if (!trimmed) return undefined;
   if (/^\/\//.test(trimmed)) return undefined;
   if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {

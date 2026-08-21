@@ -309,6 +309,16 @@ test('safeUrl passes ordinary links through and drops script schemes', () => {
   assert.equal(safeUrl('   '), undefined);
 });
 
+test('a tab or newline hidden inside the scheme does not smuggle a script URL past safeUrl', () => {
+  // A URL parser strips these before reading the scheme, so a naive regex
+  // check that only looks at the raw string can be walked straight past.
+  assert.equal(safeUrl('jav\tascript:alert(1)'), undefined);
+  assert.equal(safeUrl('jav\nascript:alert(1)'), undefined);
+  assert.equal(safeUrl('jav\rascript:alert(1)'), undefined);
+  // Same trick against the protocol-relative-URL check.
+  assert.equal(safeUrl('/\t/evil.test/phish'), undefined);
+});
+
 test('a poisoned booking URL falls back to the venue instead of shipping a script link', () => {
   // A cinema site we do not control supplies every booking URL, so this is the
   // realistic shape of the attack: valid HTML, hostile scheme.

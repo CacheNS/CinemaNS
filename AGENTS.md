@@ -19,7 +19,7 @@ its old name deliberately (R-13.8).
 ## Commands
 
 ```
-npm test          # 132 tests, fixtures only, no network
+npm test          # 135 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -129,7 +129,14 @@ what a well-meaning change could undo:
   does not have.
 - **`safeUrl()` guards every `href`/`src`** (R-17.8). `escapeHtml` does not stop
   `javascript:` — it contains nothing to escape. A rejected booking URL falls
-  back to the venue programme, never to nothing.
+  back to the venue programme, never to nothing. Tab/newline/CR are stripped
+  before the scheme and `//`-prefix checks, matching what a URL parser strips
+  before reading the scheme — otherwise `"jav\tascript:alert(1)"` bypasses a
+  naive scheme regex entirely.
+- **CineStar's booking/detail links are origin-restricted, same as Arena's**
+  (R-17.6a). A scraped `https://` href is no longer trusted just because it
+  parses — `cinestarUrl()` rejects anything that doesn't resolve back to
+  `cinestarcinemas.rs`.
 - **The page has a strict CSP and therefore no inline script or style**
   (R-17.9). Adding either breaks the site; a test asserts their absence.
 - **Fetches are size-capped, deadline-bound and redirect-capped** (R-17.3–4),

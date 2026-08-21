@@ -99,8 +99,24 @@ export class HttpError extends Error {
     readonly url: string,
     readonly status: number,
   ) {
-    super(`HTTP ${status} for ${url}`);
+    super(`HTTP ${status} for ${redactQuery(url)}`);
     this.name = 'HttpError';
+  }
+}
+
+/**
+ * TMDb's URL carries `api_key` as a query parameter, so any message built from
+ * a raw URL is one stray `console.error` away from printing the key into a
+ * public CI log. Nothing does that today, but the query string adds nothing a
+ * maintainer needs to diagnose a failing fetch, so it never reaches `.message`
+ * at all rather than relying on every future call site to remember to redact.
+ */
+function redactQuery(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.search ? `${parsed.origin}${parsed.pathname} (upitni string sakriven)` : url;
+  } catch {
+    return url;
   }
 }
 

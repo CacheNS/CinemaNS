@@ -20,12 +20,24 @@ const TYPES: Record<string, string> = {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? '/', `http://localhost:${PORT}`);
-  let pathname = decodeURIComponent(url.pathname);
+  let pathname: string;
+  try {
+    // Malformed percent-encoding (a lone "%") throws URIError; a bad request
+    // must not be able to take the whole preview server down with it.
+    pathname = decodeURIComponent(url.pathname);
+  } catch {
+    res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end('Loš zahtev');
+    return;
+  }
   if (pathname.endsWith('/')) pathname += 'index.html';
 
   const file = path.join(DIST, path.normalize(pathname).replace(/^([/\\])+/, ''));
-  // Never serve outside dist/, even if the request tries to escape it.
-  if (!file.startsWith(DIST) || !existsSync(file) || !statSync(file).isFile()) {
+  // Never serve outside dist/, even if the request tries to escape it. The
+  // separator check matters: without it, "dist-evil" would pass a plain
+  // startsWith(DIST) test the same as a genuine subpath would.
+  const withinDist = file === DIST || file.startsWith(DIST + path.sep);
+  if (!withinDist || !existsSync(file) || !statSync(file).isFile()) {
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
     res.end('Nije pronađeno');
     return;

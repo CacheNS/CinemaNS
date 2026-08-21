@@ -1,6 +1,6 @@
 ---
 name: cinema-requirements
-description: Baseline requirements and hard-won data-accuracy rules for Kokice, the Novi Sad + Beograd cinema aggregator. Use before changing anything in this repository — scrapers/adapters (Arena, Cineplexx, CineStar), title matching, TMDb enrichment, age ratings, dubbing/subtitling labels, filters, the city switcher, the rendered HTML/CSS, the PWA install flow, or the hourly GitHub Actions build.
+description: Baseline requirements and hard-won data-accuracy rules for Kokice, the Novi Sad + Beograd cinema aggregator. Use before changing anything in this repository — scrapers/adapters (Arena, Cineplexx, CineStar), title matching, TMDb enrichment, age ratings, dubbing/subtitling labels, filters, the city switcher, the rendered HTML/CSS, the PWA install flow, or the hourly GitHub Actions build. Also use after making any such change, to update REQUIREMENTS.md, AGENTS.md, copilot-instructions.md and this file — without being asked.
 ---
 
 # Kokice (Novi Sad + Beograd cinema aggregator) — requirements baseline
@@ -101,12 +101,18 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
     selector at all. Do not try to parameterize it by city.
 21. **`safeUrl()` guards every `href`/`src`, and the page has a strict CSP**
     (§17.8–17.9). `escapeHtml` does not stop `javascript:` — there is nothing in
-    it to escape. The CSP has no `unsafe-inline`; its one inline `<script>` is
-    the JSON-LD block, allowed by an exact-content `sha256-` hash rather than by
-    loosening the policy (§18.6) — any *other* inline `<script>` or `style=`
-    still breaks the site, and a test asserts their absence. Inside that JSON-LD
-    block, use `isSafeUrl()` (validated, unescaped), not `safeUrl()` — the
-    latter's HTML-entity escaping corrupts URLs in raw JSON text (§18.5).
+    it to escape. Tab, newline and CR are stripped before the scheme/`//`
+    checks run, matching what a URL parser strips before reading the scheme —
+    without it, a tab hidden inside "javascript:" bypassed the scheme regex
+    entirely (§17.8). CineStar's booking/detail links are origin-restricted
+    the same way Arena's are (§17.6a) — a scraped `https://` href is no longer
+    trusted just because it parses. The CSP has no `unsafe-inline`; its one
+    inline `<script>` is the JSON-LD block, allowed by an exact-content
+    `sha256-` hash rather than by loosening the policy (§18.6) — any *other*
+    inline `<script>` or `style=` still breaks the site, and a test asserts
+    their absence. Inside that JSON-LD block, use `isSafeUrl()` (validated,
+    unescaped), not `safeUrl()` — the latter's HTML-entity escaping corrupts
+    URLs in raw JSON text (§18.5).
 22. **Fetches are deadline-bound, size-capped and redirect-capped** (§17.3–17.4),
     and the `curl_cffi` child is SIGKILLed after 60 s (§17.5). The body is read
     while the abort timer is still armed — moving that read outside it
@@ -132,7 +138,7 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 
 ```
 npx tsc --noEmit
-npm test          # 132 tests, fixtures only, no network
+npm test          # 135 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```
@@ -140,6 +146,29 @@ npm run serve     # http://localhost:3000
 Add a regression test for every parsing bug you fix, and make the fixture
 reproduce the **real** markup — a simplified fixture once passed while the
 parser was broken against the live page (§12.3).
+
+## Keep documentation in sync — do this without being asked
+
+Every one of the docs below has gone stale at least once because a change
+landed without it. Update them as part of the change itself, not as a
+follow-up someone has to request:
+
+- **`REQUIREMENTS.md`** — add or amend a numbered requirement (`R-<section>.<n>`)
+  for any new behavior, changed threshold, or fixed bug that future work could
+  silently regress. Cite the id in commit messages.
+- **The test count** — `npm test`'s total appears in four places:
+  `REQUIREMENTS.md` (§12.4), `AGENTS.md`, `.github/copilot-instructions.md` and
+  this file's own "Before committing" section above. Adding or removing a test
+  means updating the number in all four, in the same change.
+- **`AGENTS.md`** and **`.github/copilot-instructions.md`** — both restate this
+  skill's content in shorter form for surfaces that don't load it. A rule
+  worth adding here is worth a matching line in both, not just one.
+- **This skill file** — if a change adds a new "rule most likely to be broken"
+  (a new numbered item candidate above), a new hard constraint, or retires a
+  "known open item" by fixing it, update those lists too.
+
+Treat "the docs didn't mention it" the same as a failing test: it means the
+change isn't finished yet.
 
 ## Known open items
 

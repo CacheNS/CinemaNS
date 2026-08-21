@@ -82,6 +82,35 @@ test('film page links are absolute so they can be fetched', () => {
   }
 });
 
+test('a booking or detail link pointing off cinestarcinemas.rs is refused', () => {
+  const page = `
+    <div class="movie-item" data-genre="Drama">
+      <div class="movie-desc">
+        <h2>Naslov</h2>
+        <a href="https://evil.test/film/naslov"></a>
+      </div>
+      <div class="poster-wrapper"><img src="/img/poster.jpg"></div>
+      <div class="day-wrapper">
+        <div class="day">DANAS, ${FIXTURE_DAYS[0]!.slice(8, 10)}.${FIXTURE_DAYS[0]!.slice(
+    5,
+    7,
+  )}.</div>
+        <a class="perf" href="https://evil.test/Shop?perf=1">
+          <span class="time">18:00</span>
+        </a>
+        <a class="perf" href="/Shop?perf=2">
+          <span class="time">20:00</span>
+        </a>
+      </div>
+    </div>`;
+  const [movie] = parseCinestar(page, FIXTURE_DAYS, 'cinestar-novi-sad', PAGE_URL);
+  assert.equal(movie?.detailUrl, undefined, 'an off-origin detail link must not be trusted');
+
+  const [offOrigin, onOrigin] = movie?.showtimes ?? [];
+  assert.equal(offOrigin?.bookingUrl, PAGE_URL, 'an off-origin booking link falls back to the page');
+  assert.equal(onOrigin?.bookingUrl, 'https://cinestarcinemas.rs/Shop?perf=2');
+});
+
 test('a premium format keeps its 3D', () => {
   assert.equal(formatFromCode('4DX/3D/TITL'), '4DX 3D');
   assert.equal(formatFromCode('4DX/TITL'), '4DX');

@@ -98,7 +98,7 @@ These look like trivia, but each one was a real bug. See §10 of
 
 ## Working in this repo
 
-- `npm test` (132 tests, no network — fixtures only) and `npx tsc --noEmit` must
+- `npm test` (135 tests, no network — fixtures only) and `npx tsc --noEmit` must
   both pass before committing.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.
@@ -120,13 +120,20 @@ what a well-meaning change could undo:
   does not have.
 - **`safeUrl()` guards every `href`/`src`** (R-17.8). `escapeHtml` does not stop
   `javascript:` — it contains nothing to escape. A rejected booking URL falls
-  back to the venue programme, never to nothing.
+  back to the venue programme, never to nothing. Tab/newline/CR are stripped
+  before the scheme and `//`-prefix checks, matching what a URL parser strips
+  before reading the scheme — otherwise `"jav\tascript:alert(1)"` bypasses a
+  naive scheme regex entirely.
 - **The page has a strict CSP and therefore no inline script or style**
   (R-17.9). Adding either breaks the site; a test asserts their absence.
 - **Fetches are size-capped, deadline-bound and redirect-capped** (R-17.3–4),
   and the `curl_cffi` child is killed after 60 s (R-17.5).
 - **Arena URLs are origin-allow-listed** (R-17.6) because Arena is fetched over
   plaintext HTTP and cannot be upgraded.
+- **CineStar's booking/detail links are origin-restricted, same as Arena's**
+  (R-17.6a). A scraped `https://` href is no longer trusted just because it
+  parses — `cinestarUrl()` rejects anything that doesn't resolve back to
+  `cinestarcinemas.rs`.
 - **Titles are capped at 300 chars** before the quadratic regexes (R-17.7).
 - **Workflow permissions are per job** (R-17.12): `build` runs the scraper with
   no write access; `persist`, `deploy` and `alert` each hold one permission.

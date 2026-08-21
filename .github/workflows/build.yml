@@ -153,11 +153,12 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           DEGRADED: ${{ needs.build.outputs.degraded }}
           BODY: ${{ needs.build.outputs.body }}
         run: |
           set -e
-          repo='${{ github.repository }}'
+          repo="$REPO"
           gh label create source-down --repo "$repo" --color d73a4a \
             --description 'A cinema source failed to refresh data' --force
           existing=$(gh issue list --repo "$repo" --label source-down --state open \

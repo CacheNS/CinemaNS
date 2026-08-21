@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { fetchText } from './http.js';
+import { HttpError, fetchText } from './http.js';
 import { resetInterpreterCache } from './impersonate.js';
 
 interface Call {
@@ -24,6 +24,12 @@ function stubFetch(statuses: number[]): { calls: Call[]; restore: () => void } {
   }) as unknown as typeof fetch;
   return { calls, restore: () => (globalThis.fetch = original) };
 }
+
+test('a query string never reaches HttpError.message, since TMDb puts its api_key there', () => {
+  const error = new HttpError('https://api.themoviedb.org/3/movie/1?api_key=super-secret', 401);
+  assert.ok(!error.message.includes('super-secret'), error.message);
+  assert.match(error.message, /^HTTP 401 for https:\/\/api\.themoviedb\.org\/3\/movie\/1/);
+});
 
 test('a bot-protection 403 is retried rather than accepted as final', async () => {
   const stub = stubFetch([403, 403, 200]);

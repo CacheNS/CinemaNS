@@ -649,7 +649,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **132 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **135 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same
@@ -939,6 +939,14 @@ for programme and poster links, plus the ticket host for booking links, with
 page is fetched over plaintext, without this a MITM could point a booking chip
 at a phishing host that a reader is about to type card details into.
 
+**R-17.6a CineStar's booking and detail links are origin-restricted too, not
+just Arena's.** `cinestarUrl()` resolves a scraped href with `new URL(href,
+ORIGIN)` and keeps it only if `.origin` is still `cinestarcinemas.rs`; anything
+else falls back to the venue's programme page. Before this, any `https://`
+href found in CineStar's markup was trusted verbatim with no host check at
+all — a compromised or malicious CineStar page could have pointed a "Kupi
+kartu" button at an external phishing site.
+
 **R-17.7 Titles are capped at 300 characters before parsing.** The noise-
 stripping regexes are quadratic — measured, not assumed: 64 KB takes ~0.7 s and
 about 1 MB takes minutes. The cap truncates rather than throwing, so one absurd
@@ -952,7 +960,11 @@ contains no character `escapeHtml` touches, so it would otherwise survive
 intact and run on click — and booking links, cinema sites, posters, trailers
 and score links all come from third parties. Only `http`, `https`, `mailto` and
 relative URLs pass; a rejected booking URL falls back to the venue programme
-(R-8.1a) rather than disappearing.
+(R-8.1a) rather than disappearing. Tab, newline and carriage return are
+stripped before either check runs — a URL parser strips the same three
+characters from anywhere in the string before reading the scheme, so
+`"jav\tascript:alert(1)"` and `"/\t/evil.test"` used to slip past a scheme
+regex and a `//`-prefix check that only ever saw the raw, un-stripped string.
 
 **R-17.9 The page ships a Content-Security-Policy** with `default-src 'none'`
 and no `unsafe-inline`. The page has no inline style, and its only inline
@@ -1040,6 +1052,20 @@ which is another reason its `cloudflareinsights.com` entries must stay
 page already shows. `npm audit` reports zero vulnerabilities across 24 runtime
 and 3 dev packages, the lockfile is v3 with integrity hashes, and no secret
 reaches `dist/` or `data/raw.json`.
+
+**R-17.21 `HttpError`'s message never carries a query string.** TMDb's
+`api_key` travels as a query parameter, so a raw URL dropped into an error
+message is one stray `console.error` away from printing the key into this
+public repo's Actions log. Nothing logs it today, but `redactQuery()` in
+`src/core/http.ts` means the message is safe by construction rather than by
+every future call site remembering not to.
+
+**R-17.22 `npm run serve` (the local preview server, not the deployed site)
+survives a malformed request.** `decodeURIComponent` throws on a lone `%`, and
+with no `try`/`catch` that took the whole process down; it now answers `400`.
+Its directory-escape check also gained a path-separator boundary — a bare
+`file.startsWith(DIST)` would treat a sibling directory like `dist-evil` as
+being inside `dist/`.
 
 ---
 

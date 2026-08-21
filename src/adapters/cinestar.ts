@@ -7,6 +7,25 @@ import type { AdapterResult, Audio, CinemaId, RawMovie, Showtime } from '../core
 const ORIGIN = 'https://cinestarcinemas.rs';
 
 /**
+ * Resolves a scraped href against CineStar's own origin and returns it only if
+ * it lands there — unlike Arena's ticket host, CineStar sells through its own
+ * domain, so anything else (a compromised or malicious href pointing off-site)
+ * is refused rather than handed to a reader as a "Kupi kartu" link. Sold-out
+ * screenings link to `javascript:;`, which parses but resolves to an opaque
+ * origin and is rejected the same way.
+ */
+function cinestarUrl(href: string | undefined): string | undefined {
+  if (!href) return undefined;
+  let url: URL;
+  try {
+    url = new URL(href, `${ORIGIN}/`);
+  } catch {
+    return undefined;
+  }
+  return url.origin === ORIGIN ? url.toString() : undefined;
+}
+
+/**
  * CineStar prints a day as "petak 21.08." or "DANAS, 19.08." with no year, so
  * the year is inferred from the build window rather than assumed to be current
  * (a December build listing January dates would otherwise land a year early).
@@ -69,12 +88,7 @@ export function parseCinestar(
     if (!rawTitle) return;
 
     const detailHref = item.find('.movie-desc a[href]').first().attr('href');
-    const detailUrl =
-      detailHref && /^https?:/i.test(detailHref)
-        ? detailHref
-        : detailHref && detailHref.startsWith('/')
-          ? `${ORIGIN}${detailHref}`
-          : undefined;
+    const detailUrl = cinestarUrl(detailHref);
     const posterUrl = item.find('.poster-wrapper img').first().attr('src');
     const synopsis = item.find('.movie-desc > p').first().text().replace(/\s+/g, ' ').trim();
 
@@ -95,11 +109,7 @@ export function parseCinestar(
         const hall = perf.find('.venue').first().text().trim();
         // Sold-out screenings link to "javascript:;" instead of the shop.
         const href = perf.attr('href') ?? '';
-        const bookingUrl = /^https?:\/\//.test(href)
-          ? href
-          : href.startsWith('/')
-            ? `${ORIGIN}${href}`
-            : pageUrl;
+        const bookingUrl = cinestarUrl(href) ?? pageUrl;
 
         // The title itself can carry the marker even when the code does not.
         const audioFromCode = audioFromFormatCode(code);
