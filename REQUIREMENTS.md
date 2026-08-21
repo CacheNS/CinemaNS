@@ -706,8 +706,8 @@ custom domain automatically.
 **R-13.11 The domain is proxied through Cloudflare, and the ordering of that
 setup is not optional.** DNS is Cloudflare's (nameservers moved from GoDaddy,
 which remains only the registrar), and the records are orange-clouded, which is
-what makes edge-injected analytics possible (R-16.3). Proxying is the target
-state; see R-14.4 for where the cutover currently stands.
+what makes edge-injected analytics possible (R-16.3). Verified live 2026-08-21:
+`kokice.org` answers `server: cloudflare` with a `cf-ray`.
 
 Three rules follow, each of which has a silent failure mode:
 
@@ -750,15 +750,18 @@ GitHub Actions from `main`. Pages source is set to GitHub Actions, all nine
 scrapers report `ok`, and the hourly workflow's data-refresh commit is confirmed
 working. The repository keeps its old name by design — see R-13.8.
 
-**R-14.4 PENDING — analytics is between modes.** The token beacon has been
-removed from the build (§16.3), and Cloudflare's automatic injection replaces it
-only once two console steps are done: set the DNS records to **proxied** with
-SSL/TLS on **Full (strict)** (R-13.11), then add `kokice.org` in Cloudflare Web
-Analytics using automatic setup. Verified 2026-08-21: the domain is live and
-correct but still **DNS-only** — `kokice.org` answers with `server: GitHub.com`
-and no `cf-ray` — so nothing is being counted in the meantime. This is the
-expected order; enabling injection before the beacon was removed would have
-double-counted every visit (§16.4).
+**R-14.4 PENDING — the proxy is live, the analytics enrolment is not.** The
+token beacon has been removed from the build (§16.3), and Cloudflare's automatic
+injection replaces it after two console steps. The first is **done**: measured
+2026-08-21, `kokice.org` answers `server: cloudflare` with a `cf-ray`, so the
+records are proxied (R-13.11) and `http://` still `301`s to HTTPS, which rules
+out the Flexible-SSL redirect loop. The second is outstanding — `kokice.org` has
+not been added in Cloudflare Web Analytics with automatic setup, so the served
+HTML contains **zero** `beacon.min.js` tags and nothing is being counted yet.
+That gap is the correct order, not an oversight: enabling injection while the
+built beacon was still present would have double-counted every visit (§16.4).
+The count restarts from zero regardless, because the old token was registered
+against `cachens.github.io` (§16.9).
 
 **R-14.5 OPEN — no Serbian trailers exist on TMDb.** Measured 2026-08-19 across
 33 films: `sr` count was zero, so posters open Croatian or English trailers
