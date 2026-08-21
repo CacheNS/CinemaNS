@@ -705,8 +705,9 @@ custom domain automatically.
 
 **R-13.11 The domain is proxied through Cloudflare, and the ordering of that
 setup is not optional.** DNS is Cloudflare's (nameservers moved from GoDaddy,
-which remains only the registrar) and the records are orange-clouded, which is
-what makes edge-injected analytics possible (R-16.3).
+which remains only the registrar), and the records are orange-clouded, which is
+what makes edge-injected analytics possible (R-16.3). Proxying is the target
+state; see R-14.4 for where the cutover currently stands.
 
 Three rules follow, each of which has a silent failure mode:
 
@@ -749,8 +750,15 @@ GitHub Actions from `main`. Pages source is set to GitHub Actions, all nine
 scrapers report `ok`, and the hourly workflow's data-refresh commit is confirmed
 working. The repository keeps its old name by design — see R-13.8.
 
-**R-14.4 DONE — analytics enabled.** Cloudflare Web Analytics runs in automatic
-mode, injected at the edge; the build carries no beacon and no token. See §16.
+**R-14.4 PENDING — analytics is between modes.** The token beacon has been
+removed from the build (§16.3), and Cloudflare's automatic injection replaces it
+only once two console steps are done: set the DNS records to **proxied** with
+SSL/TLS on **Full (strict)** (R-13.11), then add `kokice.org` in Cloudflare Web
+Analytics using automatic setup. Verified 2026-08-21: the domain is live and
+correct but still **DNS-only** — `kokice.org` answers with `server: GitHub.com`
+and no `cf-ray` — so nothing is being counted in the meantime. This is the
+expected order; enabling injection before the beacon was removed would have
+double-counted every visit (§16.4).
 
 **R-14.5 OPEN — no Serbian trailers exist on TMDb.** Measured 2026-08-19 across
 33 films: `sr` count was zero, so posters open Croatian or English trailers
