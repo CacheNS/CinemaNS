@@ -63,6 +63,35 @@ than a mix of both.
 The choice lives in the URL (`?grad=beograd`) and is remembered locally; an
 explicit link always wins over the remembered preference.
 
+### Search visibility (SEO)
+
+Each of the eight generated day pages is a distinct, indexable document
+rather than a copy of the same shell:
+
+- Its own `<title>`/description (day, film count, showtime count) and a
+  `<link rel="canonical">` pointing at `https://kokice.org/…`, so search
+  engines never treat `index.html` and the day pages as duplicates of one
+  another.
+- Open Graph and Twitter Card tags, so a shared link renders with a title,
+  description and image instead of a bare URL.
+- A JSON-LD `ScreeningEvent`/`Movie` graph describing exactly what's on
+  screen in the default city that day — scoped to the same content a
+  no-JS reader actually sees, not the whole two-city payload, so it can
+  never claim more than the page shows.
+- `sitemap.xml` and `robots.txt`, generated at build time from the same
+  day list the pages themselves use.
+
+The JSON-LD block is the one inline `<script>` this CSP-hardened page
+allows, and it earns that exception the same way the rest of the CSP
+works: rather than adding `'unsafe-inline'`, the build hashes that block's
+*exact* rendered content and lists only that hash in `script-src`. The
+hash is recomputed every build, so it only ever matches the JSON-LD that
+was actually shipped with it.
+
+`https://kokice.org` is the single source of truth for every absolute URL
+above (`BASE_URL` in `src/render/html.ts`), so a future domain change is a
+one-line edit.
+
 ### Matching titles across cinemas
 
 The same film is spelled differently at every cinema, sometimes in Serbian and

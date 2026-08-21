@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 
-import { escapeHtml, renderDayPage, renderPages, runtimeBucket, safeUrl } from './html.js';
+import { escapeHtml, renderDayPage, renderPages, renderRobots, renderSitemap, runtimeBucket, safeUrl, BASE_URL } from './html.js';
 import { CINEMA_IDS, CITIES, DEFAULT_CITY } from '../core/types.js';
 import type { CinemaId, Snapshot, SourceStatus } from '../core/types.js';
 
@@ -327,9 +328,27 @@ test('the page carries a CSP that forbids inline script', () => {
   assert.ok(page.includes("default-src 'none'"));
   assert.ok(!page.includes("'unsafe-inline'"));
   assert.ok(!page.includes("'unsafe-eval'"));
-  // The CSP is worthless if the page grows an inline script or style.
-  assert.ok(!/<script(?![^>]*\ssrc=)/.test(page), 'inline <script> would be blocked by the CSP');
+  // The CSP is worthless if the page grows an inline script or style — except
+  // the JSON-LD block, which is allowed by exact-content hash rather than
+  // 'unsafe-inline' (see the next test).
+  assert.ok(
+    !/<script(?![^>]*\ssrc=)(?![^>]*application\/ld\+json)/.test(page),
+    'inline <script> would be blocked by the CSP unless it is the hashed JSON-LD block',
+  );
   assert.ok(!/\sstyle="/.test(page), 'inline style= would be blocked by the CSP');
+});
+
+test('the CSP hash matches the actual JSON-LD script content', () => {
+  // If these ever drift apart, the browser silently drops the structured
+  // data instead of throwing, so this is the only thing that would catch it.
+  const page = renderDayPage(snapshot, '2026-08-19');
+  const script = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(page)?.[1];
+  assert.ok(script, 'a JSON-LD script block must be present');
+  const expectedHash = createHash('sha256').update(script!, 'utf8').digest('base64');
+  assert.ok(
+    page.includes(`'sha256-${expectedHash}'`),
+    'script-src must carry the hash of the exact rendered JSON-LD content',
+  );
 });
 
 test('the CSP keeps allowing the edge-injected analytics beacon', () => {
@@ -356,4 +375,66 @@ test('no analytics beacon is built into the page', () => {
   const page = renderDayPage(snapshot, '2026-08-19');
   assert.ok(!page.includes('beacon.min.js'), 'the beacon must come from the edge, not the build');
   assert.ok(!page.includes('data-cf-beacon'));
+});
+
+test('every page declares its own canonical URL under the live domain', () => {
+  const today = renderDayPage(snapshot, '2026-08-19');
+  assert.ok(today.includes(`<link rel="canonical" href="${BASE_URL}/">`));
+
+  const tomorrow = renderDayPage(snapshot, '2026-08-20');
+  assert.ok(tomorrow.includes(`<link rel="canonical" href="${BASE_URL}/2026-08-20.html">`));
+});
+
+test('titles are unique per day and carry the target keywords', () => {
+  const today = renderDayPage(snapshot, '2026-08-19');
+  const tomorrow = renderDayPage(snapshot, '2026-08-20');
+  const todayTitle = /<title>([^<]*)<\/title>/.exec(today)?.[1];
+  const tomorrowTitle = /<title>([^<]*)<\/title>/.exec(tomorrow)?.[1];
+  assert.ok(todayTitle?.includes('Repertoar bioskopa Novi Sad i Beograd'));
+  assert.notEqual(todayTitle, tomorrowTitle, 'each day page needs its own title');
+});
+
+test('emits Open Graph and Twitter Card tags with absolute image URLs', () => {
+  const page = renderDayPage(snapshot, '2026-08-19');
+  assert.ok(page.includes('property="og:title"'));
+  assert.ok(page.includes('property="og:description"'));
+  assert.ok(page.includes(`property="og:url" content="${BASE_URL}/"`));
+  assert.ok(page.includes(`property="og:image" content="${BASE_URL}/assets/icon-512.png"`));
+  assert.ok(page.includes('name="twitter:card" content="summary"'));
+});
+
+test('poster images carry the film title as alt text', () => {
+  const withPoster = structuredClone(snapshot);
+  withPoster.movies[0]!.posterUrl = 'https://example.test/poster.jpg';
+  const page = renderDayPage(withPoster, '2026-08-19');
+  assert.ok(page.includes('alt="Vajana — plakat"'));
+});
+
+test('JSON-LD structured data lists screenings for the default city only', () => {
+  const page = renderDayPage(snapshot, '2026-08-19');
+  const script = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(page)?.[1];
+  assert.ok(script);
+  const parsed = JSON.parse(script!);
+  assert.equal(parsed['@context'], 'https://schema.org');
+  const names = parsed['@graph'].map((event: { name: string }) => event.name);
+  // "Vajana" plays in both cities on 2026-08-19; "Samo u Beogradu" plays only
+  // in Beograd, which is not the default city, so it must be absent.
+  assert.ok(names.includes('Vajana'));
+  assert.ok(!names.includes('Samo u Beogradu'));
+  for (const event of parsed['@graph']) {
+    assert.equal(event['@type'], 'ScreeningEvent');
+    assert.equal(event.workPresented['@type'], 'Movie');
+  }
+});
+
+test('renderSitemap lists an absolute, canonical URL for every day', () => {
+  const xml = renderSitemap(snapshot);
+  assert.ok(xml.includes(`<loc>${BASE_URL}/</loc>`));
+  assert.ok(xml.includes(`<loc>${BASE_URL}/2026-08-20.html</loc>`));
+});
+
+test('renderRobots allows everything and points at the sitemap', () => {
+  const robots = renderRobots();
+  assert.ok(robots.includes('Allow: /'));
+  assert.ok(robots.includes(`Sitemap: ${BASE_URL}/sitemap.xml`));
 });

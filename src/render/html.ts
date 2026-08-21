@@ -1,8 +1,21 @@
+import { createHash } from 'node:crypto';
+
 import { formatDayLabel, formatDayShort, formatTimestamp } from '../core/dates.js';
 import { trailerLink } from '../core/trailer.js';
 import { toSerbianLatin } from '../core/titles.js';
 import { CINEMAS, CITIES, DEFAULT_CITY, cityById } from '../core/types.js';
 import type { Movie, Showtime, Snapshot } from '../core/types.js';
+
+/**
+ * The site's one and only domain since the migration off the GitHub Pages
+ * subdomain. Every absolute URL on the page (canonical, Open Graph, sitemap,
+ * robots.txt) is built from this single constant, so a future domain change
+ * is a one-line edit rather than a search-and-replace.
+ */
+export const BASE_URL = 'https://kokice.org';
+
+/** The keyword-bearing base title, shared by every page and reused in `<h1>`. */
+const SITE_TITLE = 'Kokice.org — Repertoar bioskopa Novi Sad i Beograd';
 
 /**
  * Escapes for HTML, and converts any Serbian Cyrillic to Latin on the way out.
@@ -29,10 +42,12 @@ export function escapeHtml(value: string): string {
  * the CSP is what stops it becoming script execution.
  *
  * It can be this strict because the page has no inline script and no inline
- * style. `img-src https:` stays deliberately broad, since posters arrive from
- * several CDNs, but it still refuses `javascript:` and `data:` script vectors.
- * `frame-ancestors` is omitted because a meta-tag CSP ignores it; that one
- * needs a real response header, which GitHub Pages does not let us set.
+ * style except the JSON-LD block below, which is allowed by exact-content
+ * hash rather than `'unsafe-inline'`. `img-src https:` stays deliberately
+ * broad, since posters arrive from several CDNs, but it still refuses
+ * `javascript:` and `data:` script vectors. `frame-ancestors` is omitted
+ * because a meta-tag CSP ignores it; that one needs a real response header,
+ * which GitHub Pages does not let us set.
  *
  * DO NOT REMOVE THE `cloudflareinsights.com` ENTRIES. Nothing in this
  * repository references those hosts any more, so they look like dead
@@ -41,25 +56,127 @@ export function escapeHtml(value: string): string {
  * `connect-src` for the page-view it reports. Dropping them leaves analytics
  * switched on in the dashboard and silently counting nothing. `html.test.ts`
  * pins this.
+ *
+ * Built per page rather than as a constant: the inline JSON-LD block (see
+ * {@link buildStructuredData}) needs its own `sha256-` source to be allowed
+ * under `script-src`, since a CSP with no `'unsafe-inline'` blocks *any*
+ * inline `<script>` — including `type="application/ld+json"`, which does
+ * not execute but is still a script element as far as CSP enforcement is
+ * concerned. The hash is exact-content, so it changes every hour with the
+ * data and cannot be reused to smuggle in anything else.
  */
-const CSP = [
-  "default-src 'none'",
-  "script-src 'self' https://static.cloudflareinsights.com",
-  "connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com",
-  "style-src 'self'",
-  "img-src 'self' https: data:",
-  "font-src 'self'",
-  "manifest-src 'self'",
-  "worker-src 'self'",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join('; ');
+function buildCsp(jsonLdHash: string): string {
+  return [
+    "default-src 'none'",
+    `script-src 'self' 'sha256-${jsonLdHash}' https://static.cloudflareinsights.com`,
+    "connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com",
+    "style-src 'self'",
+    "img-src 'self' https: data:",
+    "font-src 'self'",
+    "manifest-src 'self'",
+    "worker-src 'self'",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ].join('; ');
+}
 
 function pageName(date: string, days: string[]): string {
   return date === days[0] ? 'index.html' : `${date}.html`;
 }
 
 /**
+ * Absolute, canonical URL for a day page. `index.html` collapses to the bare
+ * origin — the two must never both be indexable, or Search Console reports
+ * them as duplicate content competing against each other.
+ */
+function pageUrl(date: string, days: string[]): string {
+  const name = pageName(date, days);
+  return name === 'index.html' ? `${BASE_URL}/` : `${BASE_URL}/${name}`;
+}
+
+/**
+ * Europe/Belgrade only ever runs at UTC+1 (CET) or UTC+2 (CEST), so the
+ * offset can be read straight off `Intl` for the specific date/time rather
+ * than hand-rolling DST rules that would drift the moment the EU changes
+ * them.
+ */
+function belgradeOffset(date: string, time: string): string {
+  const instant = new Date(`${date}T${time}:00Z`);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Belgrade',
+    timeZoneName: 'shortOffset',
+  }).formatToParts(instant);
+  const zone = parts.find((part) => part.type === 'timeZoneName')?.value ?? 'GMT+1';
+  const hours = Number(/GMT([+-]\d+)/.exec(zone)?.[1] ?? 1);
+  return `${hours >= 0 ? '+' : '-'}${String(Math.abs(hours)).padStart(2, '0')}:00`;
+}
+
+/**
+ * JSON-LD `ScreeningEvent` list for the films actually visible on first
+ * paint (the default city, this date) — matching the structured data to the
+ * visible content is what keeps it honest rather than a bait-and-switch for
+ * crawlers. Each event embeds its own `Movie` under `workPresented`, which
+ * is the shape schema.org's own `ScreeningEvent` examples use.
+ *
+ * Returned as a compact JSON string with every `<` escaped: the page embeds
+ * this inside a `<script>` element, and a cinema-supplied title containing
+ * `</script>` must not be able to end the element early.
+ */
+function buildStructuredData(snapshot: Snapshot, date: string): string {
+  const defaultCinemas = new Set<string>(cityById(DEFAULT_CITY).cinemaIds);
+
+  const events = snapshot.movies.flatMap((movie) => {
+    const showtimesToday = movie.showtimes.filter(
+      (showtime) => showtime.date === date && defaultCinemas.has(showtime.cinemaId),
+    );
+    if (showtimesToday.length === 0) return [];
+
+    const movieObject: Record<string, unknown> = {
+      '@type': 'Movie',
+      name: toSerbianLatin(movie.title),
+    };
+    if (movie.originalTitle) movieObject.alternateName = toSerbianLatin(movie.originalTitle);
+    const poster = movie.posterUrl ? isSafeUrl(movie.posterUrl) : undefined;
+    if (poster) movieObject.image = poster;
+    if (movie.genres.length) movieObject.genre = movie.genres.map(toSerbianLatin);
+    if (movie.runtimeMinutes) movieObject.duration = `PT${movie.runtimeMinutes}M`;
+    if (movie.score) {
+      movieObject.aggregateRating = {
+        '@type': 'AggregateRating',
+        ratingValue: movie.score.value,
+        ratingCount: movie.score.votes,
+        bestRating: 10,
+        worstRating: 0,
+      };
+    }
+
+    return showtimesToday.map((showtime) => {
+      const cinema = CINEMAS[showtime.cinemaId];
+      const eventUrl = isSafeUrl(showtime.bookingUrl) ?? isSafeUrl(cinema.url);
+      const event: Record<string, unknown> = {
+        '@type': 'ScreeningEvent',
+        name: toSerbianLatin(movie.title),
+        startDate: `${showtime.date}T${showtime.time}:00${belgradeOffset(
+          showtime.date,
+          showtime.time,
+        )}`,
+        location: {
+          '@type': 'MovieTheater',
+          name: toSerbianLatin(cinema.name),
+          url: isSafeUrl(cinema.url),
+        },
+        workPresented: movieObject,
+      };
+      if (eventUrl) event.url = eventUrl;
+      return event;
+    });
+  });
+
+  const graph = { '@context': 'https://schema.org', '@graph': events };
+  return JSON.stringify(graph).replace(/</g, '\\u003C');
+}
+
+/**
  * Escaping alone does not make a URL safe to put in an `href` or `src`:
  * `javascript:alert(1)` contains no character `escapeHtml` touches, so it
  * survives intact and runs on click. Every URL on this page — booking links,
@@ -70,8 +187,14 @@ function pageName(date: string, days: string[]): string {
  * `mailto` reach the document, and anything else (including protocol-relative
  * `//evil.test` and `data:`) is dropped. Relative URLs are kept, since the
  * page's own assets are relative.
+ *
+ * `isSafeUrl` does the validation and returns the raw (trimmed) value;
+ * `safeUrl` wraps it with HTML-escaping for use in attributes. Contexts
+ * that are not HTML attributes — the JSON-LD block, in particular — must use
+ * `isSafeUrl` directly, or `&` would come out as the literal text `&amp;`
+ * inside a `<script>` element's raw, non-HTML-entity-decoded text.
  */
-export function safeUrl(value: string): string | undefined {
+function isSafeUrl(value: string): string | undefined {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
   if (/^\/\//.test(trimmed)) return undefined;
@@ -84,7 +207,12 @@ export function safeUrl(value: string): string | undefined {
     }
     if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) return undefined;
   }
-  return escapeHtml(trimmed);
+  return trimmed;
+}
+
+export function safeUrl(value: string): string | undefined {
+  const trimmed = isSafeUrl(value);
+  return trimmed === undefined ? undefined : escapeHtml(trimmed);
 }
 
 function audioLabel(audio: Showtime['audio']): string {
@@ -253,7 +381,7 @@ function renderMovie(movie: Movie, date: string): string {
   const trailer = trailerLink(movie);
   const posterSrc = movie.posterUrl ? safeUrl(movie.posterUrl) : undefined;
   const posterImage = posterSrc
-    ? `<img class="poster" src="${posterSrc}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+    ? `<img class="poster" src="${posterSrc}" alt="${escapeHtml(`${movie.title} — plakat`)}" loading="lazy" referrerpolicy="no-referrer">`
     : `<div class="poster poster--empty" aria-hidden="true"></div>`;
   const trailerHref = safeUrl(trailer.url);
   // Wrapped rather than replaced, so a film with no poster is still clickable.
@@ -417,14 +545,36 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
     : '';
   const pastState = `<p class="empty" id="empty-past" hidden>Sve današnje projekcije su već počele.${tomorrowLink}</p>`;
 
+  const dayLabel = formatDayLabel(date, days[0]);
+  const canonicalUrl = pageUrl(date, days);
+  const pageTitle = `${SITE_TITLE} | ${dayLabel}`;
+  const description = `Repertoar bioskopa u Novom Sadu i Beogradu za ${dayLabel}: ${movieCount} filmova, ${showtimeCount} projekcija. Osvežava se svakog sata.`;
+  const ogImage = `${BASE_URL}/assets/icon-512.png`;
+
+  const jsonLd = buildStructuredData(snapshot, date);
+  const jsonLdHash = createHash('sha256').update(jsonLd, 'utf8').digest('base64');
+  const csp = buildCsp(jsonLdHash);
+
   return `<!DOCTYPE html>
 <html lang="sr-Latn">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="${CSP}">
-  <title>Kokice.org — ${escapeHtml(formatDayLabel(date, days[0]))}</title>
-  <meta name="description" content="Kokice — objedinjen repertoar bioskopa u Novom Sadu i Beogradu, osvežen svakog sata.">
+  <meta http-equiv="Content-Security-Policy" content="${csp}">
+  <title>${escapeHtml(pageTitle)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <link rel="canonical" href="${canonicalUrl}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Kokice">
+  <meta property="og:locale" content="sr_RS">
+  <meta property="og:title" content="${escapeHtml(pageTitle)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:url" content="${canonicalUrl}">
+  <meta property="og:image" content="${ogImage}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="${escapeHtml(pageTitle)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${ogImage}">
   <link rel="stylesheet" href="assets/style.css">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0f1115">
@@ -433,10 +583,11 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Kokice">
+  <script type="application/ld+json">${jsonLd}</script>
 </head>
 <body>
   <header class="header">
-    <h1>Kokice.org — Repertoar bioskopa</h1>
+    <h1>${escapeHtml(SITE_TITLE)}</h1>
     ${renderCitySubtitles()}
     ${renderCityNav()}
   </header>
@@ -508,4 +659,36 @@ export function renderPages(snapshot: Snapshot): Map<string, string> {
     pages.set(pageName(date, snapshot.days), renderDayPage(snapshot, date));
   }
   return pages;
+}
+
+/**
+ * One `<url>` per day page, pointing at the same canonical addresses the
+ * pages declare for themselves. `lastmod` is the build time truncated to a
+ * date, since the underlying data can only ever be at most an hour stale.
+ */
+export function renderSitemap(snapshot: Snapshot): string {
+  const lastmod = snapshot.generatedAt.slice(0, 10);
+  const urls = snapshot.days
+    .map(
+      (date) => `  <url>
+    <loc>${pageUrl(date, snapshot.days)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>hourly</changefreq>
+  </url>`,
+    )
+    .join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>
+`;
+}
+
+/** Wide open: every page here is meant to be crawled, so this exists only to point at the sitemap. */
+export function renderRobots(): string {
+  return `User-agent: *
+Allow: /
+
+Sitemap: ${BASE_URL}/sitemap.xml
+`;
 }

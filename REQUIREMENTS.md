@@ -439,21 +439,23 @@ new tab (`target="_blank" rel="noopener noreferrer"`). The link is built by
 `src/core/trailer.ts` and has two forms:
 
 - **Exact** — TMDb returned a YouTube video for the film, so the link opens it.
-  Preference is strictly **Serbian → `sh`/`hr`/`bs` → English**; language outranks
-  both video type and officiality, because a Serbian teaser serves this audience
-  better than an official English trailer. Non-YouTube and unknown-language
-  videos are ignored. Within one language band a video tagged with country `RS`
-  wins — distributors sometimes label a Serbian upload `hr` — but country can
-  never lift a video above a higher language band.
+  Preference is strictly **Serbian → English**; `sh`/`hr`/`bs` are deliberately
+  **not** ranked, so a Croatian-tagged upload is skipped in favour of falling
+  through to English rather than standing in for Serbian. Language outranks
+  both video type and officiality, because a Serbian teaser serves this
+  audience better than an official English trailer. Non-YouTube and
+  unranked-language videos are ignored. Within one language band a video tagged
+  with country `RS` wins, but country can never lift a video above a higher
+  language band.
 
-  The build logs the resulting distribution (`Trejleri: hr 10 · en 13 ·
-  pretraga 10`). This exists because the ranking is only worth as much as TMDb's
-  catalogue: when a poster opens a Croatian trailer it is almost always because
-  TMDb has no Serbian-tagged video for that film, and without the log that looks
-  indistinguishable from a ranking bug. Measured 2026-08-19 across 33 films:
-  **`sr` was zero** — every regional trailer TMDb held was tagged `hr`. So the
-  Croatian wording users see ("uskoro u kinima" rather than "uskoro u
-  bioskopima") is a gap in TMDb, not a defect in the ordering.
+  The build logs the resulting distribution (`Trejleri: en 23 · pretraga 10`).
+  This exists because the ranking is only worth as much as TMDb's catalogue:
+  measured 2026-08-19 across 33 films, **`sr` was zero** — every regional
+  trailer TMDb held was tagged `hr`. Rather than surface those Croatian
+  uploads as a stand-in for Serbian, the ranking now excludes them and falls
+  through to English, so a poster never opens a trailer in the wrong regional
+  language; the log line makes the resulting English/search split visible
+  instead of it looking like a ranking bug.
 - **Search** — otherwise the link is a YouTube search for
   `"<title> <original title> trailer srpski"`. This is deliberate: Serbian
   trailers are uploaded by local distributors (Blitz, MegaCom, Taramount) and
@@ -634,7 +636,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **119 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **127 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same
@@ -764,9 +766,10 @@ The count restarts from zero regardless, because the old token was registered
 against `cachens.github.io` (§16.9).
 
 **R-14.5 OPEN — no Serbian trailers exist on TMDb.** Measured 2026-08-19 across
-33 films: `sr` count was zero, so posters open Croatian or English trailers
-(R-8.10). Nothing to fix on this side; revisit only if TMDb's catalogue
-improves. The `Trejleri:` build line is the check.
+33 films: `sr` count was zero, so with `sh`/`hr`/`bs` excluded from the ranking
+(R-8.10) posters open English trailers, or fall back to a YouTube search, until
+TMDb's catalogue gains Serbian-tagged videos. The `Trejleri:` build line is the
+check.
 
 ---
 
@@ -939,10 +942,13 @@ relative URLs pass; a rejected booking URL falls back to the venue programme
 (R-8.1a) rather than disappearing.
 
 **R-17.9 The page ships a Content-Security-Policy** with `default-src 'none'`
-and no `unsafe-inline`, which is possible only because the page has no inline
-script and no inline style. **Adding either would break the site**, and a test
-asserts their absence. `img-src` stays broad (`https:`) because posters come
-from several CDNs. `frame-ancestors` is absent by necessity: a meta-tag CSP
+and no `unsafe-inline`. The page has no inline style, and its only inline
+script is the JSON-LD block (§18.5), which is allowed by an exact-content
+`sha256-` hash in `script-src` rather than by loosening the policy — a test
+recomputes that hash from the rendered block and asserts it matches. Any
+*other* inline script or style would still break the site, and a test asserts
+their absence. `img-src` stays broad (`https:`) because posters come from
+several CDNs. `frame-ancestors` is absent by necessity: a meta-tag CSP
 ignores it and GitHub Pages cannot set response headers.
 
 **R-17.10 The service worker caches only successful, same-origin, non-redirected
@@ -1018,3 +1024,54 @@ which is another reason its `cloudflareinsights.com` entries must stay
 page already shows. `npm audit` reports zero vulnerabilities across 24 runtime
 and 3 dev packages, the lockfile is v3 with integrity hashes, and no secret
 reaches `dist/` or `data/raw.json`.
+
+---
+
+## 18. Search engine optimization (SEO)
+
+**R-18.1 Every day page declares its own canonical URL.** `<link
+rel="canonical" href="https://kokice.org/…">` is built from a single
+`BASE_URL` constant in `src/render/html.ts`, so `index.html` (today) and the
+seven dated pages never read as duplicates of one another, and a future
+domain change is a one-line edit rather than a search-and-replace.
+
+**R-18.2 Title and description are unique per day.** Both are built from the
+day label plus that day's film/showtime counts, not a static string repeated
+across all eight pages — search engines otherwise treat near-identical
+titles as one weak signal instead of eight distinct ones.
+
+**R-18.3 `sitemap.xml` and `robots.txt` are generated at build time** from
+the same `snapshot.days` list the pages themselves render from, so they can
+never drift out of sync with what actually gets deployed. Both live at the
+site root next to `data.json`.
+
+**R-18.4 Open Graph and Twitter Card tags use only absolute URLs**
+(`og:url`, `og:image`, canonical). A relative URL in a shared-link preview
+resolves against the *sharing platform's* origin, not the site's, and
+silently breaks the preview.
+
+**R-18.5 JSON-LD structured data is scoped to exactly what a no-JS reader
+sees: the default city, that day.** It is a `ScreeningEvent`/`Movie` graph,
+one event per visible showtime, each with `workPresented` embedding the
+film. Scoping it to the visible subset rather than the full two-city
+payload is deliberate — structured data describing content the page does
+not actually show on first paint is the kind of mismatch crawlers penalize.
+Poster/cinema/booking URLs inside it are validated but **not**
+HTML-entity-escaped (`isSafeUrl`, not `safeUrl`): the block is JSON inside a
+`<script>` element, which is raw text, not an HTML attribute, so an
+HTML-escaped `&amp;` would corrupt the URL rather than protect anything.
+
+**R-18.6 The JSON-LD block is the one inline script the CSP allows, via an
+exact-content hash, not `'unsafe-inline'`.** See R-17.9. The hash is
+recomputed on every build from the exact rendered content, so it can never
+be reused to authorize anything else, and a test asserts the two match.
+
+**R-18.7 Poster images carry the film title as `alt` text**, not `alt=""`
+— both an accessibility fix and a minor image-search signal, at no cost
+since the title is already known server-side.
+
+**R-18.8 Accepted trade-off, unchanged by the above: no per-city `<title>`/
+`<h1>`.** See R-7b.9. §18.1–§18.7 make the existing combined page more
+indexable; they do not add the separate city-specific entry pages that
+R-7b.9 already flags as the follow-up if search traffic ever outweighs
+switch latency.

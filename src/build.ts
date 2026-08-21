@@ -11,7 +11,7 @@ import { mergeMovies } from './core/merge.js';
 import { CINEMAS, CINEMA_IDS, CITIES } from './core/types.js';
 import type { CinemaId, Movie, RawMovie, Snapshot, SourceStatus } from './core/types.js';
 import { TmdbClient } from './tmdb/client.js';
-import { renderPages } from './render/html.js';
+import { renderPages, renderRobots, renderSitemap } from './render/html.js';
 import { MANIFEST, renderIcon } from './render/icon.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -207,6 +207,8 @@ async function writeSite(snapshot: Snapshot): Promise<void> {
     'utf8',
   );
   await writeFile(path.join(DIST_DIR, '.nojekyll'), '', 'utf8');
+  await writeFile(path.join(DIST_DIR, 'sitemap.xml'), renderSitemap(snapshot), 'utf8');
+  await writeFile(path.join(DIST_DIR, 'robots.txt'), renderRobots(), 'utf8');
 
   // Assets are plain files, not compiled, so they are copied from src.
   const assets = path.join(ROOT, 'src', 'render', 'assets');

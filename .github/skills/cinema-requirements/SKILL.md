@@ -27,6 +27,7 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 | Merging | `src/core/merge.ts` | §5, §10 |
 | TMDb + age | `src/tmdb/client.ts`, `src/core/ratings.ts` | §6 |
 | Rendering | `src/render/html.ts`, `assets/style.css` | §8 |
+| SEO (canonical, sitemap, JSON-LD) | `src/render/html.ts` (`renderSitemap`, `renderRobots`) | §18 |
 | Filters | `src/render/assets/app.js` | §7 |
 | City switch | `src/core/types.ts` (registry), `html.ts`, `app.js` | §1, §7b |
 | PWA | `src/render/icon.ts`, `sw.js` | §9 |
@@ -74,8 +75,8 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 15. **The analytics beacon is injected by Cloudflare at the edge, not built**
     (§16.3). `kokice.org` is proxied, so there is no token and no analytics code
     in the repository. Don't add a beacon tag back — it would double-count
-    (§16.4) — and **don't remove the `cloudflareinsights.com` entries from the
-    `CSP` const**, which now look like dead allowances but are what lets the
+    (§16.4) — and **don't remove the `cloudflareinsights.com` entries from
+    `buildCsp()`**, which now look like dead allowances but are what lets the
     injected script run at all (§16.5). A site tag visible in the served HTML is
     by design, not a leak.
 16. **Serbian Latin only, never Cyrillic** (§8.12). TMDb's `sr-RS` responses are
@@ -100,8 +101,12 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
     selector at all. Do not try to parameterize it by city.
 21. **`safeUrl()` guards every `href`/`src`, and the page has a strict CSP**
     (§17.8–17.9). `escapeHtml` does not stop `javascript:` — there is nothing in
-    it to escape. The CSP has no `unsafe-inline`, so **adding an inline
-    `<script>` or `style=` breaks the site**; a test asserts their absence.
+    it to escape. The CSP has no `unsafe-inline`; its one inline `<script>` is
+    the JSON-LD block, allowed by an exact-content `sha256-` hash rather than by
+    loosening the policy (§18.6) — any *other* inline `<script>` or `style=`
+    still breaks the site, and a test asserts their absence. Inside that JSON-LD
+    block, use `isSafeUrl()` (validated, unescaped), not `safeUrl()` — the
+    latter's HTML-entity escaping corrupts URLs in raw JSON text (§18.5).
 22. **Fetches are deadline-bound, size-capped and redirect-capped** (§17.3–17.4),
     and the `curl_cffi` child is SIGKILLed after 60 s (§17.5). The body is read
     while the abort timer is still armed — moving that read outside it
@@ -111,12 +116,17 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 24. **Workflow permissions are per job** (§17.12). `build` runs the scraper with
     no write access; `persist` commits and `deploy` publishes. `deploy` must
     never depend on `persist` (§17.13).
+25. **Every day page is independently indexable** (§18). Canonical URL, unique
+    title/description, OG/Twitter tags and a per-day, default-city-scoped
+    JSON-LD graph are all built from `BASE_URL` and `snapshot`, never
+    hardcoded — a future domain change or a new day in the window must not
+    require touching this logic.
 
 ## Before committing
 
 ```
 npx tsc --noEmit
-npm test          # 119 tests, fixtures only, no network
+npm test          # 127 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```
