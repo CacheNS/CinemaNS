@@ -90,16 +90,16 @@ export interface TmdbLookup {
 /**
  * Picks a YouTube trailer, preferring one a Serbian speaker gets most from.
  *
- * Order: Serbian, then the mutually intelligible neighbours, then English. An
- * English trailer is a genuine fallback rather than a failure — it is still the
- * right film — but it ranks below any regional upload, and a real video always
- * beats the YouTube-search fallback the poster link uses when TMDb has nothing.
+ * Order: Serbian, then English. The mutually intelligible neighbours
+ * (sh/hr/bs) are deliberately excluded — even though a Croatian upload is
+ * linguistically close, it is not the language wanted here, so a video tagged
+ * that way is skipped in favour of falling through to English. An English
+ * trailer is a genuine fallback rather than a failure — it is still the right
+ * film — but it ranks below a Serbian upload, and a real video always beats
+ * the YouTube-search fallback the poster link uses when TMDb has nothing.
  */
 const LANGUAGE_RANK: Record<string, number> = {
   sr: 4,
-  sh: 3,
-  hr: 3,
-  bs: 3,
   en: 1,
 };
 

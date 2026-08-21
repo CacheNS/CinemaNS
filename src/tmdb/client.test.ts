@@ -81,12 +81,12 @@ test('English is used when nothing regional exists', () => {
   assert.equal(key, 'en1');
 });
 
-test('Croatian stands in ahead of English but behind Serbian', () => {
+test('Croatian is ignored, so English wins when no Serbian video exists', () => {
   const results = [
     { key: 'en1', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'en' },
     { key: 'hr1', site: 'YouTube', type: 'Trailer', official: false, iso_639_1: 'hr' },
   ];
-  assert.equal(pickTrailerKey({ results }), 'hr1');
+  assert.equal(pickTrailerKey({ results }), 'en1');
   assert.equal(
     pickTrailerKey({ results: [...results, { key: 'sr1', site: 'YouTube', type: 'Teaser', iso_639_1: 'sr' }] }),
     'sr1',
@@ -111,39 +111,39 @@ test('a film with no videos yields no key', () => {
   assert.equal(pickTrailerKey({ results: [] }), undefined);
 });
 
-test('the full order is Serbian, then the neighbours, then English', () => {
+test('the order is Serbian, then English, with Croatian ignored', () => {
   const all = [
     { key: 'en1', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'en' },
     { key: 'hr1', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'hr' },
     { key: 'sr1', site: 'YouTube', type: 'Teaser', iso_639_1: 'sr' },
   ];
   assert.equal(pickTrailer({ results: all })?.language, 'sr');
-  assert.equal(pickTrailer({ results: all.slice(0, 2) })?.language, 'hr');
+  assert.equal(pickTrailer({ results: all.slice(0, 2) })?.language, 'en', 'Croatian is not a ranked language');
   assert.equal(pickTrailer({ results: all.slice(0, 1) })?.language, 'en');
 });
 
 test('the Serbian country code breaks ties inside one language band', () => {
-  // Distributors sometimes tag a Serbian upload as 'hr' but with country RS.
+  // Distributors sometimes tag a Serbian upload with country RS vs HR.
   assert.equal(
     pickTrailer({
       results: [
-        { key: 'hr-hr', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'hr', iso_3166_1: 'HR' },
-        { key: 'hr-rs', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'hr', iso_3166_1: 'RS' },
+        { key: 'sr-hr', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'sr', iso_3166_1: 'HR' },
+        { key: 'sr-rs', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'sr', iso_3166_1: 'RS' },
       ],
     })?.key,
-    'hr-rs',
+    'sr-rs',
   );
 });
 
 test('country never outranks language', () => {
-  // An English video from Serbia must not beat a Croatian one.
+  // An English video from Serbia must not beat a Serbian one.
   assert.equal(
     pickTrailer({
       results: [
         { key: 'en-rs', site: 'YouTube', type: 'Trailer', official: true, iso_639_1: 'en', iso_3166_1: 'RS' },
-        { key: 'hr-hr', site: 'YouTube', type: 'Teaser', iso_639_1: 'hr', iso_3166_1: 'HR' },
+        { key: 'sr1', site: 'YouTube', type: 'Teaser', iso_639_1: 'sr' },
       ],
     })?.key,
-    'hr-hr',
+    'sr1',
   );
 });
