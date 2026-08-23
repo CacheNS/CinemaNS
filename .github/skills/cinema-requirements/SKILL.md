@@ -14,6 +14,14 @@ breaking one is a regression.
 
 Requirements have stable ids (`R-10.3`). Cite them when a change touches them.
 
+**Always fetch the latest changes before making any change.** Run
+`git fetch --all` and check `git status`/`git branch -vv` for how the current
+branch relates to its remote before editing anything — this repo is built by
+an hourly Actions run that commits `data/raw.json` and `data/health.json`
+straight to `main` (§17.14), so `main` moves on its own even with no human
+pushes. Starting from a stale base risks a conflict-laden or silently
+overwritten commit later.
+
 ## Orientation
 
 Static site → built hourly by GitHub Actions → served by GitHub Pages. A
