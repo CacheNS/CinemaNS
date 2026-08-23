@@ -14,7 +14,7 @@ Each requirement has a stable id (`R-*`) so changes can reference it.
 **R-1.1** One page that shows what is playing in a chosen city's cinemas, merged
 across all of that city's cinemas and grouped by movie.
 
-**R-1.2** Covers exactly nine venues across two cities. Venue coverage was
+**R-1.2** Covers exactly ten venues across two cities. Venue coverage was
 verified against the live sites and APIs; it is not a guess.
 
 **Novi Sad**
@@ -35,12 +35,13 @@ verified against the live sites and APIs; it is not a guess.
 | `cineplexx-beo` | **Cineplexx BEO** | Cineplexx API |
 | `cineplexx-galerija` | **Cineplexx Galerija** | Cineplexx API |
 | `cinestar-beograd-ada` | **CineStar Ada Mall** | `cinestarcinemas.rs/beograd-concept-cinema-ada-mall` |
+| `tuck-beograd` | **Tuckwood Cineplex** | `tuck.rs/repertoar` (server-rendered HTML) |
 
 **R-1.2.1** Arena Cineplex exists **only in Novi Sad** — `arenacineplex.com` has
 no location selector at all, the whole site is one cinema. The cinema set is
 genuinely per-city, not a chain list filtered by city.
 
-**R-1.2.2** Niš and Subotica have none of these three chains and cannot be added
+**R-1.2.2** Niš and Subotica have none of these four chains and cannot be added
 without an entirely new adapter.
 
 **R-1.3** The cinema's location must always be part of its displayed name
@@ -182,8 +183,8 @@ block and show Delta City and Galerija showtimes as though they were the same
 building. Chain-level facts live on `Cinema.chain`.
 
 **R-4.8** Metadata trust order is a property of the **chain**
-(`cineplexx → cinestar → arena`, R-10.5), so `METADATA_TRUST` keys on `Chain`.
-All five Beograd Cineplexx venues must be trusted identically.
+(`cineplexx → cinestar → tuck → arena`, R-10.3), so `METADATA_TRUST` keys on
+`Chain`. All five Beograd Cineplexx venues must be trusted identically.
 
 **R-4.9** Every venue belongs to exactly one city, and each city's `cinemaIds`
 lists only its own venues. The registry is hand-written in two places, so this
@@ -246,9 +247,11 @@ kid-friendly; Horror ⇒ 16+; otherwise show **"Uzrast nepoznat"**.
 **R-6.5 Never present a guess as fact.** Non-confident ratings are visually
 marked, and are marked especially when the "Za decu" filter is active.
 
-**R-6.6** None of the three chains publish a usable age rating — verified.
-Cineplexx returns `rating: "o.A."` for every film; Arena and CineStar have no
-certification markup. Do not attempt to source age from the cinemas.
+**R-6.6** None of the four chains publish a usable age rating — verified.
+Cineplexx returns `rating: "o.A."` for every film; Arena, CineStar and Tuck
+have no certification markup (Tuck's theme has an `amy-movie-field-mpaa`
+class in CSS, but it renders empty on the live page). Do not attempt to
+source age from the cinemas.
 
 ---
 
@@ -401,6 +404,10 @@ against the live sites:
   purchase key from screenings that have already started, and those fall back to
   the venue programme; R-7c then hides them, so the fallback is not normally
   reachable.
+- **Tuck** → `ulaznice.tuck.rs/rs/site/repertoireDetail/index/<id>`, one link
+  per **movie**, not per screening — Tuck's listing page does not expose a
+  per-session id, so every showtime of that film shares the same booking chip.
+  This is an accepted per-movie shape (see R-1.2/venue table), not a bug.
 
 **R-8.1b** A missing deep link degrades to the **venue's own programme page**,
 never to a film page that does not identify the cinema.
@@ -528,14 +535,18 @@ Cineplexx 215/215.
 `4DX/3D/TITL` ⇒ `"4DX 3D"`, not `"4DX"`.
 
 **R-10.3 Metadata source ranking.** When cinemas disagree about metadata,
-prefer the more trustworthy source: **cineplexx → cinestar → arena**. Applies to
-`originalTitle` and `runtimeMinutes`.
+prefer the more trustworthy source: **cineplexx → cinestar → tuck → arena**.
+Applies to `originalTitle` and `runtimeMinutes`.
 
 Rationale, both confirmed on live pages:
 - Arena's detail block is *positional prose*, so a film with no original title
   shows the **director** in that slot (`ASTRALNA PODMUKLOST` → "Jacob Chase").
   CineStar's labelled `Izvorni naslov` has the correct value.
 - Arena **rounds** runtimes (150 vs the true 145; 100 vs 128).
+- Tuck labels its fields explicitly (title, original title, duration) the same
+  way Cineplexx/CineStar do, so it outranks Arena's positional prose — but it
+  is a newer, less-audited source than Cineplexx/CineStar, so it stays below
+  them.
 
 **R-10.4 Domestic films are labelled `original` ("domaći film")**, never
 "titlovano". The signal is Arena's `Zemlja porekla: RS`.
@@ -649,7 +660,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **135 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **146 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same
@@ -761,7 +772,7 @@ title, because there is no second source to outrank Arena. Accepted; no reliable
 heuristic was found.
 
 **R-14.3 DONE — published.** Live at <https://kokice.org>, built and deployed by
-GitHub Actions from `main`. Pages source is set to GitHub Actions, all nine
+GitHub Actions from `main`. Pages source is set to GitHub Actions, all ten
 scrapers report `ok`, and the hourly workflow's data-refresh commit is confirmed
 working. The repository keeps its old name by design — see R-13.8.
 
@@ -946,6 +957,16 @@ else falls back to the venue's programme page. Before this, any `https://`
 href found in CineStar's markup was trusted verbatim with no host check at
 all — a compromised or malicious CineStar page could have pointed a "Kupi
 kartu" button at an external phishing site.
+
+**R-17.6b Tuck's ticket host is allow-listed like Arena's and CineStar's, but
+is never upgraded to HTTPS.** `tuckUrl()` permits `https://www.tuck.rs` (the
+programme site) and, specifically, **`http://ulaznice.tuck.rs`** (the ticket
+host) — verified empirically: `https://ulaznice.tuck.rs` hangs/times out
+(nothing listens on 443), while `http://` returns 200. Unlike Arena's ticket
+host, there is no working HTTPS endpoint to upgrade to, so the allow-list
+keeps the link on plain HTTP rather than producing a dead `https://` chip.
+Anything off those two origins is dropped and falls back to the programme
+page, same as Arena/CineStar.
 
 **R-17.7 Titles are capped at 300 characters before parsing.** The noise-
 stripping regexes are quadratic — measured, not assumed: 64 KB takes ~0.7 s and

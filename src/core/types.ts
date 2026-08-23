@@ -14,22 +14,25 @@ export type CinemaId =
   | 'cineplexx-big-beograd'
   | 'cineplexx-beo'
   | 'cineplexx-galerija'
-  | 'cinestar-beograd-ada';
+  | 'cinestar-beograd-ada'
+  | 'tuck-beograd';
 
 /** The operator. Metadata trust is a property of the chain, not the venue. */
-export type Chain = 'arena' | 'cineplexx' | 'cinestar';
+export type Chain = 'arena' | 'cineplexx' | 'cinestar' | 'tuck';
 
 export type CityId = 'novi-sad' | 'beograd';
 
 /**
  * How to scrape a venue. Arena carries no parameter because its whole site is
  * one cinema; the other two are addressed by the identifier their own site
- * uses.
+ * uses. Tuck also carries no parameter — like Arena, it is a single venue with
+ * no location selector.
  */
 export type CinemaSource =
   | { kind: 'arena' }
   | { kind: 'cineplexx'; urlName: string }
-  | { kind: 'cinestar'; slug: string };
+  | { kind: 'cinestar'; slug: string }
+  | { kind: 'tuck' };
 
 export interface Cinema {
   id: CinemaId;
@@ -134,6 +137,15 @@ export const CINEMAS: Record<CinemaId, Cinema> = {
     url: 'https://cinestarcinemas.rs/beograd-concept-cinema-ada-mall',
     source: { kind: 'cinestar', slug: 'beograd-concept-cinema-ada-mall' },
   },
+  'tuck-beograd': {
+    id: 'tuck-beograd',
+    chain: 'tuck',
+    city: 'beograd',
+    name: 'Tuckwood Cineplex',
+    shortName: 'Tuckwood',
+    url: 'https://www.tuck.rs/',
+    source: { kind: 'tuck' },
+  },
 };
 
 export const CITIES: City[] = [
@@ -156,6 +168,7 @@ export const CITIES: City[] = [
       'cineplexx-big-beograd',
       'cineplexx-beo',
       'cinestar-beograd-ada',
+      'tuck-beograd',
     ],
   },
 ];

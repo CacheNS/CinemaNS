@@ -6,7 +6,7 @@
 > [`REQUIREMENTS.md`](REQUIREMENTS.md) first — it is the project's baseline
 > specification.
 
-The combined programme of nine cinemas in two cities on one fast page.
+The combined programme of ten cinemas in two cities on one fast page.
 
 **Novi Sad**
 
@@ -22,6 +22,7 @@ The combined programme of nine cinemas in two cities on one fast page.
 |---|---|
 | Cineplexx Delta City, Ušće, BIG, BEO, Galerija | JSON API `app.cineplexx.rs/api/v1` |
 | CineStar Ada Mall | `cinestarcinemas.rs/beograd-concept-cinema-ada-mall` (HTML) |
+| Tuckwood Cineplex | `tuck.rs/repertoar` (HTML) |
 
 Arena has no Belgrade venue — `arenacineplex.com` is a single cinema with no
 location selector at all.
@@ -34,13 +35,13 @@ is in Serbian.
 ## How it works
 
 There is no server. Every hour GitHub Actions runs a build that scrapes all
-nine venues, merges the films and generates static HTML; GitHub Pages serves it
+ten venues, merges the films and generates static HTML; GitHub Pages serves it
 from a CDN. A visitor's request never triggers scraping, so the page is instant
 and cannot go down — the worst case is slightly stale data.
 
 ```
 GitHub Actions (hourly cron)
-  9 venues across Novi Sad + Beograd  (in parallel)
+  10 venues across Novi Sad + Beograd  (in parallel)
             ↓
      TMDb (titles, age ratings, scores)
             ↓

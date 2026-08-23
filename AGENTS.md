@@ -11,7 +11,7 @@ For the condensed version, see
 ## What this is
 
 A static site, rebuilt hourly by GitHub Actions and served by GitHub Pages, that
-scrapes and merges movie showtimes from **nine cinema venues across Novi Sad and
+scrapes and merges movie showtimes from **ten cinema venues across Novi Sad and
 Beograd**, enriches them via TMDb, and renders one Serbian-language page per day
 plus a reusable `data.json`. The app is called **Kokice**; the repository keeps
 its old name deliberately (R-13.8).
@@ -19,7 +19,7 @@ its old name deliberately (R-13.8).
 ## Commands
 
 ```
-npm test          # 135 tests, fixtures only, no network
+npm test          # 146 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -53,9 +53,11 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
 ## Data-accuracy rules (each one was a real bug)
 
 - `4DX/3D/TITL` ⇒ `"4DX 3D"`; premium formats compose with 3D.
-- Metadata trust order is **cineplexx → cinestar → arena**: Arena's film page is
-  positional prose that yields the *director* when a film has no original title,
-  and it rounds runtimes.
+- Metadata trust order is **cineplexx → cinestar → tuck → arena**: Arena's film
+  page is positional prose that yields the *director* when a film has no
+  original title, and it rounds runtimes. Tuck labels its fields explicitly
+  like Cineplexx/CineStar, so it outranks Arena but stays below the two
+  longer-audited sources.
 - Parse Arena's detail rows via the `<strong>` label's own container — the rows
   run together (`RSGodina proizvodnje`), so a body-text regex fails.
 - `DS` in an Arena title is not a dubbing marker.
@@ -66,6 +68,11 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   screening id are leftover placeholders. Drop them by the **missing id**, never
   by the time — a genuine midnight screening looks identical otherwise.
 - CineStar's `.age` field holds genre, not an age rating.
+- Tuck's booking link is per **movie**, not per session — the same
+  `ulaznice.tuck.rs/rs/site/repertoireDetail/index/<id>` link repeats on every
+  day cell for a film, because the listing page has no per-session id. Its
+  ticket host is HTTP-only (`https://` on it hangs), unlike Arena's, which
+  upgrades cleanly — `tuckUrl()` allow-lists `http://ulaznice.tuck.rs` as-is.
 - Domestic Serbian films are `audio: 'original'` ("domaći film"), remapped at
   merge level so all cinemas agree. Only Arena publishes the country and Arena
   is Novi-Sad-only, so TMDb's `original_language == 'sr'` is a second signal

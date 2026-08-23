@@ -184,6 +184,29 @@ test('an exact running time beats a rounded one', async () => {
   assert.equal(movies[0]?.runtimeMinutes, 145);
 });
 
+test('Tuck metadata is trusted over Arena but not over CineStar', async () => {
+  // Tuck labels its fields explicitly (title, runtime) like CineStar, unlike
+  // Arena's positional prose, so it should win against Arena but lose to
+  // CineStar in the trust order (R-4.8).
+  const { movies: vsArena } = await mergeMovies(
+    [
+      raw('arena-novi-sad', 'SPAJDERMEN', 'SPAJDERMEN', { runtimeMinutes: 150 }),
+      raw('tuck-beograd', 'Spajdermen', 'Spider-Man', { runtimeMinutes: 145 }),
+    ],
+    offlineTmdb(),
+  );
+  assert.equal(vsArena[0]?.runtimeMinutes, 145);
+
+  const { movies: vsCinestar } = await mergeMovies(
+    [
+      raw('tuck-beograd', 'Spajdermen', 'Spider-Man', { runtimeMinutes: 150 }),
+      raw('cinestar-novi-sad', 'Spajdermen', 'Spider-Man', { runtimeMinutes: 145 }),
+    ],
+    offlineTmdb(),
+  );
+  assert.equal(vsCinestar[0]?.runtimeMinutes, 145);
+});
+
 test('a domestic film is neither dubbed nor subtitled', async () => {
   const { movies } = await mergeMovies(
     [

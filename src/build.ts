@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { scrapeArena } from './adapters/arena.js';
 import { scrapeCineplexx } from './adapters/cineplexx.js';
 import { scrapeCinestar } from './adapters/cinestar.js';
+import { scrapeTuck } from './adapters/tuck.js';
 import { windowDays } from './core/dates.js';
 import { mergeMovies } from './core/merge.js';
 import { CINEMAS, CINEMA_IDS, CITIES } from './core/types.js';
@@ -43,6 +44,8 @@ const SCRAPERS: Record<CinemaId, (days: string[]) => Promise<{ movies: RawMovie[
             return scrapeCineplexx(days, id, source.urlName);
           case 'cinestar':
             return scrapeCinestar(days, id, source.slug);
+          case 'tuck':
+            return scrapeTuck(days);
         }
       };
       return [id, scrape];
