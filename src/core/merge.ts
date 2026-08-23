@@ -9,9 +9,11 @@ const FUZZY_THRESHOLD = 0.82;
 
 /**
  * How far each cinema's film metadata (original title, running time) can be
- * trusted. Cineplexx serves it from a structured API, CineStar labels the
- * fields explicitly, and Arena is scraped positionally out of prose — where a
- * missing original title leaves the director sitting in its place.
+ * trusted. Cineplexx serves it from a structured API, CineStar and Tuck both
+ * label their fields explicitly, and Arena is scraped positionally out of
+ * prose — where a missing original title leaves the director sitting in its
+ * place. Tuck ranks below CineStar only because it is a newer, less-audited
+ * source; it ranks above Arena because its fields are labeled, not prose.
  *
  * Keyed by chain, not venue: how a site publishes its metadata is a property of
  * the operator, so all five Beograd Cineplexx venues are trusted identically.
@@ -19,7 +21,8 @@ const FUZZY_THRESHOLD = 0.82;
 const METADATA_TRUST: Record<Chain, number> = {
   cineplexx: 0,
   cinestar: 1,
-  arena: 2,
+  tuck: 2,
+  arena: 3,
 };
 
 function byMetadataTrust(raws: RawMovie[]): RawMovie[] {

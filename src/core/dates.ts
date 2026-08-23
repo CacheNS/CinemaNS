@@ -55,7 +55,8 @@ const WEEKDAYS = [
   'subota',
 ];
 
-const MONTHS = [
+/** Serbian month names, lower-case nominative, index 0 = January. */
+export const MONTHS = [
   'januar',
   'februar',
   'mart',

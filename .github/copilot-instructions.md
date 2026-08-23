@@ -9,10 +9,10 @@ in commit messages and PR descriptions when a change touches them.
 ## What this is
 
 A static site, rebuilt hourly by GitHub Actions and served by GitHub Pages, that
-scrapes and merges showtimes from **nine cinema venues across Novi Sad and
-Beograd** (Arena, Cineplexx, CineStar), enriches them via TMDb, and renders one
-Serbian-language HTML page per day. The app is named **Kokice**; the repository
-keeps its old name on purpose until the domain move (R-13.8).
+scrapes and merges showtimes from **ten cinema venues across Novi Sad and
+Beograd** (Arena, Cineplexx, CineStar, Tuck), enriches them via TMDb, and
+renders one Serbian-language HTML page per day. The app is named **Kokice**;
+the repository keeps its old name on purpose until the domain move (R-13.8).
 
 ## Non-negotiable constraints
 
@@ -48,7 +48,9 @@ These look like trivia, but each one was a real bug. See §10 of
 - Premium formats compose with 3D: `4DX/3D/TITL` is `"4DX 3D"`, not `"4DX"`.
 - Arena's detail block is positional prose, so a film with no original title
   shows its **director** in that slot. Arena also **rounds** runtimes. Hence the
-  metadata trust order **cineplexx → cinestar → arena**.
+  metadata trust order **cineplexx → cinestar → tuck → arena**: Tuck labels its
+  fields explicitly like Cineplexx/CineStar, so it outranks Arena but stays
+  below the two longer-audited sources.
 - Arena's detail rows run together (`RSGodina proizvodnje`), so parse by reading
   the `<strong>` label's own container, not with a regex over the body text.
 - `DS` in an Arena title is **not** a dubbing marker.
@@ -59,6 +61,11 @@ These look like trivia, but each one was a real bug. See §10 of
   screening id are leftover placeholders. Drop them by the **missing id**, never
   by the time — a genuine midnight screening looks identical otherwise.
 - CineStar's `.age` field contains **genre**, not an age rating.
+- Tuck's booking link is per **movie**, not per session — the same
+  `ulaznice.tuck.rs/.../repertoireDetail/index/<id>` link repeats on every day
+  cell for a film, since the listing has no per-session id. Its ticket host is
+  **HTTP-only** (`https://` hangs), unlike Arena's, which upgrades cleanly —
+  `tuckUrl()` allow-lists `http://ulaznice.tuck.rs` as-is, with no upgrade.
 - Domestic Serbian films are `audio: 'original'` ("domaći film"), never
   "titlovano" — and the remap happens at merge level so all cinemas agree.
   Only Arena publishes the country of production and Arena is Novi-Sad-only, so
@@ -98,7 +105,7 @@ These look like trivia, but each one was a real bug. See §10 of
 
 ## Working in this repo
 
-- `npm test` (135 tests, no network — fixtures only) and `npx tsc --noEmit` must
+- `npm test` (146 tests, no network — fixtures only) and `npx tsc --noEmit` must
   both pass before committing.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.
@@ -134,6 +141,10 @@ what a well-meaning change could undo:
   (R-17.6a). A scraped `https://` href is no longer trusted just because it
   parses — `cinestarUrl()` rejects anything that doesn't resolve back to
   `cinestarcinemas.rs`.
+- **Tuck's ticket host is allow-listed too, but never upgraded to HTTPS**
+  (R-17.6b) — `https://ulaznice.tuck.rs` hangs (nothing listens on 443), so
+  `tuckUrl()` keeps `http://ulaznice.tuck.rs` as-is instead of producing a
+  dead `https://` chip.
 - **Titles are capped at 300 chars** before the quadratic regexes (R-17.7).
 - **Workflow permissions are per job** (R-17.12): `build` runs the scraper with
   no write access; `persist`, `deploy` and `alert` each hold one permission.

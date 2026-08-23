@@ -1,6 +1,6 @@
 ---
 name: cinema-requirements
-description: Baseline requirements and hard-won data-accuracy rules for Kokice, the Novi Sad + Beograd cinema aggregator. Use before changing anything in this repository — scrapers/adapters (Arena, Cineplexx, CineStar), title matching, TMDb enrichment, age ratings, dubbing/subtitling labels, filters, the city switcher, the rendered HTML/CSS, the PWA install flow, or the hourly GitHub Actions build. Also use after making any such change, to update REQUIREMENTS.md, AGENTS.md, copilot-instructions.md and this file — without being asked.
+description: Baseline requirements and hard-won data-accuracy rules for Kokice, the Novi Sad + Beograd cinema aggregator. Use before changing anything in this repository — scrapers/adapters (Arena, Cineplexx, CineStar, Tuck), title matching, TMDb enrichment, age ratings, dubbing/subtitling labels, filters, the city switcher, the rendered HTML/CSS, the PWA install flow, or the hourly GitHub Actions build. Also use after making any such change, to update REQUIREMENTS.md, AGENTS.md, copilot-instructions.md and this file — without being asked.
 ---
 
 # Kokice (Novi Sad + Beograd cinema aggregator) — requirements baseline
@@ -14,15 +14,23 @@ breaking one is a regression.
 
 Requirements have stable ids (`R-10.3`). Cite them when a change touches them.
 
+**Always fetch the latest changes before making any change.** Run
+`git fetch --all` and check `git status`/`git branch -vv` for how the current
+branch relates to its remote before editing anything — this repo is built by
+an hourly Actions run that commits `data/raw.json` and `data/health.json`
+straight to `main` (§17.14), so `main` moves on its own even with no human
+pushes. Starting from a stale base risks a conflict-laden or silently
+overwritten commit later.
+
 ## Orientation
 
 Static site → built hourly by GitHub Actions → served by GitHub Pages. A
-Node.js + TypeScript build scrapes nine venues across two cities in parallel,
+Node.js + TypeScript build scrapes ten venues across two cities in parallel,
 enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus `data.json`.
 
 | Area | Where | Spec |
 |---|---|---|
-| Scrapers | `src/adapters/{arena,cineplexx,cinestar}.ts` | §1, §10 |
+| Scrapers | `src/adapters/{arena,cineplexx,cinestar,tuck}.ts` | §1, §10 |
 | Title matching | `src/core/titles.ts` | §5 |
 | Merging | `src/core/merge.ts` | §5, §10 |
 | TMDb + age | `src/tmdb/client.ts`, `src/core/ratings.ts` | §6 |
@@ -44,9 +52,11 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 3. **Dubbing is per-showtime.** Filtering at the card level shows cards whose
    listed times are actually subtitled — the exact mistake a parent gets burned
    by (§7.2–7.3).
-4. **Metadata trust order is cineplexx → cinestar → arena** (§10.3). Arena's
-   film page is positional prose, so it yields the *director* when a film has no
-   original title, and it rounds runtimes.
+4. **Metadata trust order is cineplexx → cinestar → tuck → arena** (§10.3).
+   Arena's film page is positional prose, so it yields the *director* when a
+   film has no original title, and it rounds runtimes. Tuck labels its fields
+   explicitly like Cineplexx/CineStar, so it outranks Arena but stays below
+   the two longer-audited sources.
 5. **Domestic Serbian films are `audio: 'original'`**, remapped at merge level
    so every cinema shows the same label (§10.4–10.5). The country signal comes
    only from Arena, which exists only in Novi Sad, so TMDb's
@@ -119,6 +129,12 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
     reintroduces a build that hangs forever.
 23. **Arena URLs are origin-allow-listed** (§17.6). It is the one source fetched
     over plaintext HTTP, so a booking chip must never be steerable off-origin.
+23a. **Tuck's ticket host is allow-listed but never upgraded to HTTPS**
+    (§17.6b) — `https://ulaznice.tuck.rs` hangs (nothing listens on 443), so
+    `tuckUrl()` keeps `http://ulaznice.tuck.rs` as-is, unlike Arena's ticket
+    host which does upgrade cleanly. Tuck's booking link is also per movie,
+    not per session — the listing page has no per-session id, so every
+    showtime of a film shares one booking chip; this is accepted, not a bug.
 24. **Workflow permissions are per job** (§17.12). `build` runs the scraper with
     no write access; `persist` commits, `deploy` publishes and `alert` opens or
     closes a GitHub issue. `deploy` must never depend on `persist` (§17.13).
@@ -138,7 +154,7 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 
 ```
 npx tsc --noEmit
-npm test          # 135 tests, fixtures only, no network
+npm test          # 146 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```
