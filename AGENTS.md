@@ -125,6 +125,10 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   reproduce the *real* markup — a simplified fixture once passed while the
   parser was broken against the live page.
 - CSS badge modifier rules must stay after the base `.badge` rule.
+- A badge's classes go on the single outermost element, never on a `<span>`
+  nested inside a wrapping `<a>`. `.badges` is a flex row with the default
+  `align-items: stretch`, so only a direct flex child gets stretched to match
+  its siblings' height — a nested badge renders visibly shorter (R-15.4a).
 
 ## Security (§17)
 

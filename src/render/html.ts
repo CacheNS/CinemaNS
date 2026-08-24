@@ -313,18 +313,29 @@ function renderAgeBadge(movie: Movie): string {
   }" title="${escapeHtml(explanation)}">${escapeHtml(rating.label)}${suffix}</span>`;
 }
 
+/** Same traffic-light idea as runtime: 7.5+ green, 5.0–7.5 amber, below 5.0 red. */
+export function scoreBucket(value: number): 'good' | 'mixed' | 'bad' {
+  if (value >= 7.5) return 'good';
+  return value >= 5.0 ? 'mixed' : 'bad';
+}
+
 function renderScoreBadge(movie: Movie): string {
   const score = movie.score;
   if (!score) return '';
   const value = score.value.toFixed(1).replace('.', ',');
+  const bucket = scoreBucket(score.value);
   const title = `Ocena publike na ${score.source} — ${score.votes} glasova`;
-  const label = `<span class="badge badge--score" title="${escapeHtml(title)}">★ ${escapeHtml(
-    value,
-  )}<span class="badge__sub">/10 ${escapeHtml(score.source)}</span></span>`;
   const scoreHref = score.url ? safeUrl(score.url) : undefined;
-  return scoreHref
-    ? `<a class="badge-link" href="${scoreHref}" rel="noopener nofollow" target="_blank">${label}</a>`
-    : label;
+  // A wrapping <a> would be the flex item instead of the badge itself, leaving
+  // the visible pill unstretched and a shade shorter than its siblings — so
+  // the badge classes go on the link directly rather than on a nested span.
+  const tag = scoreHref ? 'a' : 'span';
+  const attrs = scoreHref
+    ? `class="badge badge-link badge--score badge--score-${bucket}" href="${scoreHref}" rel="noopener nofollow" target="_blank"`
+    : `class="badge badge--score badge--score-${bucket}"`;
+  return `<${tag} ${attrs} title="${escapeHtml(title)}">★ ${escapeHtml(
+    value,
+  )}<span class="badge__sub">/10 ${escapeHtml(score.source)}</span></${tag}>`;
 }
 
 /**

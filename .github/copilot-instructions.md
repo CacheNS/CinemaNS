@@ -116,6 +116,10 @@ These look like trivia, but each one was a real bug. See §10 of
   was broken on the live page.
 - CSS badge modifier rules must stay *after* the base `.badge` rule, or its
   `color` wins.
+- A badge's classes belong on the single outermost element, never on a `<span>`
+  nested inside a wrapping `<a>`. `.badges` is a flex row with the default
+  `align-items: stretch`, so only a direct flex child stretches to match its
+  siblings' height — nest one and it renders visibly shorter (R-15.4a).
 
 ## Security (§17)
 

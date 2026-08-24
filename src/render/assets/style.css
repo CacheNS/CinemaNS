@@ -302,6 +302,9 @@ main {
   border-color: rgba(255, 201, 77, 0.45);
   font-weight: 600;
 }
+.badge--score-good { color: var(--kid); border-color: rgba(110, 231, 168, 0.45); }
+.badge--score-mixed { color: var(--teen); border-color: rgba(255, 201, 77, 0.45); }
+.badge--score-bad { color: var(--adult); border-color: rgba(255, 139, 139, 0.45); }
 
 .badge__sub {
   color: var(--muted);

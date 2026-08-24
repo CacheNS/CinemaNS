@@ -434,6 +434,20 @@ naming the source country.
 
 **R-8.6 Ratings/scores** from TMDb shown as an audience score badge.
 
+**R-8.6a Score traffic light**, same idea as R-8.4, on the score badge itself:
+
+| Score | Colour |
+|---|---|
+| `< 5.0` | red |
+| `5.0–7.4` | yellow / amber |
+| `>= 7.5` | green |
+
+The badge classes go directly on the outermost element (the `<a>` when the
+score links out, a `<span>` otherwise) — never on a `<span>` nested inside an
+unstyled wrapper. `.badges` is a flex row with the default `align-items:
+stretch`, so a direct child is stretched to match its siblings' height; a
+nested child is not, and renders visibly shorter than the other badges.
+
 **R-8.7** Posters are referenced by remote URL. No image hosting.
 
 **R-8.8** Footer shows last build time and any stale-source warnings.
@@ -810,6 +824,13 @@ break one cinema visibly rather than the whole site.
 **R-15.4** CSS badge modifier rules must stay **after** the base `.badge` rule.
 Placing them before it lets `.badge`'s `color` win — this has already caused one
 bug.
+
+**R-15.4a** A badge's `.badge`/`.badge--*` classes must go on the single,
+outermost element rendered for it — never on a `<span>` nested inside a
+wrapping `<a>` or other element. `.badges` is a flex row with the default
+`align-items: stretch`; only a direct flex child gets stretched to match its
+siblings' height, so a nested badge renders visibly shorter (this has already
+caused one bug, on the score badge — R-8.6a).
 
 **R-15.5** Age ratings are advisory. Serbia exposes no statutory cinema
 certification, so badges reflect the best available foreign certification, and

@@ -2,7 +2,17 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 
-import { escapeHtml, renderDayPage, renderPages, renderRobots, renderSitemap, runtimeBucket, safeUrl, BASE_URL } from './html.js';
+import {
+  escapeHtml,
+  renderDayPage,
+  renderPages,
+  renderRobots,
+  renderSitemap,
+  runtimeBucket,
+  scoreBucket,
+  safeUrl,
+  BASE_URL,
+} from './html.js';
 import { CINEMA_IDS, CITIES, DEFAULT_CITY } from '../core/types.js';
 import type { CinemaId, Snapshot, SourceStatus } from '../core/types.js';
 
@@ -239,6 +249,17 @@ test('shows the audience score', () => {
   assert.ok(today.includes('★ 7,3'));
   assert.ok(today.includes('/10 TMDb'));
   assert.ok(today.includes('https://example.test/tmdb/1'));
+});
+
+test('colour-codes the audience score', () => {
+  assert.equal(scoreBucket(4.9), 'bad');
+  assert.equal(scoreBucket(5.0), 'mixed');
+  assert.equal(scoreBucket(7.4), 'mixed');
+  assert.equal(scoreBucket(7.5), 'good');
+
+  // Fixture score is 7.25, which lands in the amber "mixed" band.
+  const today = renderDayPage(snapshot, '2026-08-19');
+  assert.ok(today.includes('badge--score-mixed'));
 });
 
 test('pairs each format with its audio version', () => {

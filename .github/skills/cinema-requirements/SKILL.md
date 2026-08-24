@@ -75,7 +75,11 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
     `session.id`; **`/movie/<slug>` is a 404** and shipped dead for a while (the
     site uses `/film/<slug>`). Arena's ticket host is forced to HTTPS. Fall back
     to the venue programme, never to a film page that hides the venue.
-12. **CSS badge modifiers go after the base `.badge` rule** (§15.4).
+12. **CSS badge modifiers go after the base `.badge` rule** (§15.4). A badge's
+    classes also belong on the single outermost element, never on a `<span>`
+    nested inside a wrapping `<a>` — `.badges` is a flex row with default
+    `align-items: stretch`, so only a direct flex child gets stretched to match
+    its siblings' height; a nested one renders visibly shorter (§15.4a).
 13. **CineStar needs `tlsFallback`.** It sits behind a Cloudflare TLS-fingerprint
     challenge and 403s from CI; headers and even headless Chromium do not clear
     it (§2.7a). It can pass locally and fail in CI — read the Actions log.
