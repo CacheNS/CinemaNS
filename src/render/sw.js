@@ -6,7 +6,7 @@
  * see — the activate handler deletes every cache whose key isn't the current
  * one, so a rename here is what evicts stale branding from existing installs.
  */
-const VERSION = 'v6';
+const VERSION = 'v7';
 const CACHE = `kokice-${VERSION}`;
 
 /**
