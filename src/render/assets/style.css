@@ -7,7 +7,6 @@
   --muted: #9aa3b2;
   --accent: #ffc94d;
   --accent-ink: #1a1408;
-  --dub: #6ee7a8;
   --kid: #6ee7a8;
   --teen: #ffc94d;
   --adult: #ff8b8b;
@@ -312,9 +311,7 @@ main {
   margin-left: 0.2rem;
 }
 
-.badge--variant { color: var(--text); }
-.badge--dubbed { color: var(--dub); border-color: rgba(110, 231, 168, 0.35); }
-.badge--original { color: #c4b5fd; border-color: rgba(196, 181, 253, 0.35); }
+.badge--variant { color: var(--muted); }
 
 .badge--runtime { font-weight: 600; }
 .badge--runtime-short {
