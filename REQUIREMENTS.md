@@ -543,6 +543,16 @@ address-bar icon).
 documents, cache-first for assets. Its scope is the site root, so `sw.js` must
 be emitted at the root, not under `assets/`.
 
+**R-9.7a The cache-first assets' cache key is derived from their own
+content, never a manually-bumped literal.** `renderServiceWorker()` in
+`build.ts` hashes `style.css` + `app.js` at build time and substitutes it for
+`__CACHE_VERSION__` in `sw.js`. A real incident motivated this: a JS/CSS
+change shipped without bumping the old hand-written `VERSION` constant, so
+returning and installed users kept the stale cached assets — the
+network-first HTML updated immediately, pairing new markup with old script
+and CSS — until they cleared storage. Hashing removes the step a person can
+forget.
+
 **R-9.8** `setupInstall()` and `registerServiceWorker()` must run **before** any
 filter early-return in `app.js`.
 
@@ -685,7 +695,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **148 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **150 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same

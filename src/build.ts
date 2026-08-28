@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile, cp } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -206,6 +207,18 @@ export async function build(): Promise<Snapshot> {
   return snapshot;
 }
 
+/**
+ * The service worker caches style.css and app.js cache-first, so a shipped
+ * change to either is invisible to returning/installed users until the
+ * cache key changes. Deriving VERSION from their content — rather than a
+ * manually-bumped literal — means a forgotten bump can no longer leave the
+ * site half-upgraded (new HTML, stale JS/CSS) for anyone with an old cache.
+ */
+export function renderServiceWorker(template: string, cachedAssetsContent: string): string {
+  const version = createHash('sha256').update(cachedAssetsContent).digest('hex').slice(0, 12);
+  return template.replace('__CACHE_VERSION__', version);
+}
+
 async function writeSite(snapshot: Snapshot): Promise<void> {
   await rm(DIST_DIR, { recursive: true, force: true });
   await mkdir(path.join(DIST_DIR, 'assets'), { recursive: true });
@@ -235,7 +248,18 @@ async function writeSite(snapshot: Snapshot): Promise<void> {
     JSON.stringify(MANIFEST, null, 2),
     'utf8',
   );
-  await cp(path.join(ROOT, 'src', 'render', 'sw.js'), path.join(DIST_DIR, 'sw.js'));
+  // The cache version is derived from the two cache-first asset files' own
+  // content (see renderServiceWorker), so it moves whenever they do.
+  const [styleCss, appJs, swTemplate] = await Promise.all([
+    readFile(path.join(assets, 'style.css'), 'utf8'),
+    readFile(path.join(assets, 'app.js'), 'utf8'),
+    readFile(path.join(ROOT, 'src', 'render', 'sw.js'), 'utf8'),
+  ]);
+  await writeFile(
+    path.join(DIST_DIR, 'sw.js'),
+    renderServiceWorker(swTemplate, styleCss + appJs),
+    'utf8',
+  );
 
   const icons: [string, number, boolean][] = [
     ['icon-192.png', 192, false],

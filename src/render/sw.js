@@ -2,11 +2,16 @@
  * Offline shell for the installed app. Pages are network-first so the hourly
  * refresh always wins when there is a connection; assets are cache-first.
  *
- * Bump VERSION whenever cached markup changes in a way installed users must
- * see — the activate handler deletes every cache whose key isn't the current
- * one, so a rename here is what evicts stale branding from existing installs.
+ * VERSION is substituted at build time (see `renderServiceWorker` in
+ * build.ts) with a hash of style.css + app.js, so a content change
+ * automatically evicts stale cached assets for installed/returning users —
+ * this used to be a manually-bumped literal, and shipping a JS/CSS change
+ * without remembering to bump it left returning visitors on stale assets
+ * while the (network-first) HTML had already moved on, so the site looked
+ * broken until they cleared storage. Hashing removes the step that can be
+ * forgotten.
  */
-const VERSION = 'v7';
+const VERSION = '__CACHE_VERSION__';
 const CACHE = `kokice-${VERSION}`;
 
 /**
