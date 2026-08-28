@@ -109,7 +109,7 @@ These look like trivia, but each one was a real bug. See §10 of
 
 ## Working in this repo
 
-- `npm test` (150 tests, no network — fixtures only) and `npx tsc --noEmit` must
+- `npm test` (152 tests, no network — fixtures only) and `npx tsc --noEmit` must
   both pass before committing.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.
@@ -129,6 +129,13 @@ These look like trivia, but each one was a real bug. See §10 of
   never a hand-bumped literal — a forgotten manual bump once left returning
   users on stale cached assets while the network-first HTML had already
   moved on (R-9.7a).
+- `sw.js` is registered as `sw.js?v=<hash>` (the same hash, embedded in every
+  page as `<meta name="sw-version">`), because GitHub Pages serves `sw.js`
+  itself with a multi-hour `Cache-Control` — a browser can keep re-installing
+  the *old* worker straight from its own HTTP cache without ever fetching the
+  new bytes, and only "clear site data" fixed it for a real visitor. A
+  version-tagged URL was never cached before, so it always reaches the
+  network (R-9.7b).
 
 ## Security (§17)
 

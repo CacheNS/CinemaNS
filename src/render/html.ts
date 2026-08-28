@@ -543,7 +543,7 @@ function renderCitySubtitles(): string {
   }).join('\n    ');
 }
 
-export function renderDayPage(snapshot: Snapshot, date: string): string {
+export function renderDayPage(snapshot: Snapshot, date: string, swVersion = ''): string {
   const days = snapshot.days;
   const moviesForDay = snapshot.movies.filter((movie) =>
     movie.showtimes.some((showtime) => showtime.date === date),
@@ -608,7 +608,9 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
   <meta name="twitter:image" content="${ogImage}">
   <link rel="stylesheet" href="assets/style.css">
   <link rel="manifest" href="manifest.webmanifest">
-  <meta name="theme-color" content="#0f1115">
+  <meta name="theme-color" content="#0f1115">${
+    swVersion ? `\n  <meta name="sw-version" content="${escapeHtml(swVersion)}">` : ''
+  }
   <link rel="icon" href="assets/icon-192.png" sizes="192x192" type="image/png">
   <link rel="apple-touch-icon" href="assets/icon-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -691,10 +693,10 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
 `;
 }
 
-export function renderPages(snapshot: Snapshot): Map<string, string> {
+export function renderPages(snapshot: Snapshot, swVersion = ''): Map<string, string> {
   const pages = new Map<string, string>();
   for (const date of snapshot.days) {
-    pages.set(pageName(date, snapshot.days), renderDayPage(snapshot, date));
+    pages.set(pageName(date, snapshot.days), renderDayPage(snapshot, date, swVersion));
   }
   return pages;
 }

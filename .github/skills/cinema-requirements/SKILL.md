@@ -166,12 +166,25 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
     `apply()`. Without this, the term survived a city switch (JS-intercepted,
     never navigates) but was silently lost on a day switch (a real page load)
     — the same class of bug R-7.5 already solved for `dubbed`/`kids`.
+29. **`sw.js` is registered as `sw.js?v=<hash>`, not bare `sw.js`** (§9.7b).
+    GitHub Pages serves `sw.js` itself with a multi-hour `Cache-Control`, so a
+    browser can keep re-fetching the *previous* worker straight from its own
+    HTTP cache — with its old `VERSION` baked in — without ever seeing the
+    new bytes; §9.7a's content hash never even gets the chance to change.
+    This actually happened: only "clear site data" fixed it for a real
+    visitor right after a deploy. `computeAssetVersion()` in `build.ts`
+    produces the one hash used both for `sw.js`'s `VERSION` and for the
+    `<meta name="sw-version">` every page embeds; `app.js` reads that meta
+    tag and appends it as `?v=` when calling `.register()`, so the
+    registration URL itself changes whenever the content does — a URL the
+    browser has never cached always reaches the network, regardless of the
+    response header.
 
 ## Before committing
 
 ```
 npx tsc --noEmit
-npm test          # 150 tests, fixtures only, no network
+npm test          # 152 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```

@@ -343,7 +343,16 @@
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function () {
+      // GitHub Pages serves sw.js itself with a multi-hour Cache-Control, so a
+      // browser can keep re-fetching the *old* worker straight from its own
+      // HTTP cache and never notice a new one exists - the VERSION-derived
+      // Cache Storage key (R-9.7a) never even gets a chance to change. A
+      // per-build version tag on the registration URL is a request the
+      // browser has never cached, so it always reaches the network (R-9.7b).
+      var meta = document.querySelector('meta[name="sw-version"]');
+      var version = meta ? meta.getAttribute('content') : '';
+      var url = version ? 'sw.js?v=' + encodeURIComponent(version) : 'sw.js';
+      navigator.serviceWorker.register(url).catch(function () {
         /* offline support is optional */
       });
     });

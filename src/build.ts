@@ -213,17 +213,40 @@ export async function build(): Promise<Snapshot> {
  * cache key changes. Deriving VERSION from their content — rather than a
  * manually-bumped literal — means a forgotten bump can no longer leave the
  * site half-upgraded (new HTML, stale JS/CSS) for anyone with an old cache.
+ *
+ * The same version also gets embedded in each page (see `renderPages`'
+ * `swVersion` argument) and appended as `sw.js?v=<version>` when the page
+ * registers the worker (R-9.7b): GitHub Pages serves `sw.js` itself with a
+ * multi-hour `Cache-Control`, so a browser can keep re-installing the *old*
+ * worker straight from its own HTTP cache without ever seeing the new bytes.
+ * A version-tagged registration URL is a request the browser has never
+ * cached, so it always reaches the network regardless of that header.
  */
+export function computeAssetVersion(cachedAssetsContent: string): string {
+  return createHash('sha256').update(cachedAssetsContent).digest('hex').slice(0, 12);
+}
+
 export function renderServiceWorker(template: string, cachedAssetsContent: string): string {
-  const version = createHash('sha256').update(cachedAssetsContent).digest('hex').slice(0, 12);
-  return template.replace('__CACHE_VERSION__', version);
+  return template.replace('__CACHE_VERSION__', computeAssetVersion(cachedAssetsContent));
 }
 
 async function writeSite(snapshot: Snapshot): Promise<void> {
   await rm(DIST_DIR, { recursive: true, force: true });
   await mkdir(path.join(DIST_DIR, 'assets'), { recursive: true });
 
-  for (const [name, html] of renderPages(snapshot)) {
+  // Assets are plain files, not compiled, so they are copied from src. Read
+  // ahead of rendering the pages: the version derived from their content is
+  // embedded in every page's <head> (see the `swVersion` argument below) as
+  // well as in sw.js itself, so both agree on the same value.
+  const assets = path.join(ROOT, 'src', 'render', 'assets');
+  const [styleCss, appJs, swTemplate] = await Promise.all([
+    readFile(path.join(assets, 'style.css'), 'utf8'),
+    readFile(path.join(assets, 'app.js'), 'utf8'),
+    readFile(path.join(ROOT, 'src', 'render', 'sw.js'), 'utf8'),
+  ]);
+  const swVersion = computeAssetVersion(styleCss + appJs);
+
+  for (const [name, html] of renderPages(snapshot, swVersion)) {
     await writeFile(path.join(DIST_DIR, name), html, 'utf8');
   }
   await writeFile(
@@ -235,8 +258,6 @@ async function writeSite(snapshot: Snapshot): Promise<void> {
   await writeFile(path.join(DIST_DIR, 'sitemap.xml'), renderSitemap(snapshot), 'utf8');
   await writeFile(path.join(DIST_DIR, 'robots.txt'), renderRobots(), 'utf8');
 
-  // Assets are plain files, not compiled, so they are copied from src.
-  const assets = path.join(ROOT, 'src', 'render', 'assets');
   if (existsSync(assets)) {
     await cp(assets, path.join(DIST_DIR, 'assets'), { recursive: true });
   }
@@ -248,13 +269,6 @@ async function writeSite(snapshot: Snapshot): Promise<void> {
     JSON.stringify(MANIFEST, null, 2),
     'utf8',
   );
-  // The cache version is derived from the two cache-first asset files' own
-  // content (see renderServiceWorker), so it moves whenever they do.
-  const [styleCss, appJs, swTemplate] = await Promise.all([
-    readFile(path.join(assets, 'style.css'), 'utf8'),
-    readFile(path.join(assets, 'app.js'), 'utf8'),
-    readFile(path.join(ROOT, 'src', 'render', 'sw.js'), 'utf8'),
-  ]);
   await writeFile(
     path.join(DIST_DIR, 'sw.js'),
     renderServiceWorker(swTemplate, styleCss + appJs),

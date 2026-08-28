@@ -19,7 +19,7 @@ its old name deliberately (R-13.8).
 ## Commands
 
 ```
-npm test          # 150 tests, fixtures only, no network
+npm test          # 152 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -140,6 +140,13 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   never a hand-bumped literal — a forgotten manual bump once left returning
   users on stale cached assets while the network-first HTML had already
   moved on (R-9.7a).
+- `sw.js` is registered as `sw.js?v=<hash>` (same hash as R-9.7a, embedded in
+  every page as `<meta name="sw-version">`), because GitHub Pages serves
+  `sw.js` itself with a multi-hour `Cache-Control` — a browser can keep
+  re-installing the *old* worker straight from its own HTTP cache without
+  ever fetching the new bytes. Only "clear site data" fixed it for a real
+  visitor. A version-tagged URL was never cached before, so it always reaches
+  the network (R-9.7b).
 
 ## Security (§17)
 
