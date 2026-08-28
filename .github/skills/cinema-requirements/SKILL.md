@@ -153,12 +153,19 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
     JSON-LD graph are all built from `BASE_URL` and `snapshot`, never
     hardcoded — a future domain change or a new day in the window must not
     require touching this logic.
+27. **The service worker's cache-key VERSION is derived, never hand-bumped**
+    (§9.7a). `renderServiceWorker()` in `build.ts` hashes `style.css` +
+    `app.js` at build time. A shipped JS/CSS change that doesn't move this
+    hash is invisible to returning/installed users — the network-first HTML
+    updates immediately, but the cache-first assets it depends on stay
+    stale — which is exactly what happened before this was automated. Don't
+    reintroduce a literal `VERSION` string in `sw.js`.
 
 ## Before committing
 
 ```
 npx tsc --noEmit
-npm test          # 148 tests, fixtures only, no network
+npm test          # 150 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```

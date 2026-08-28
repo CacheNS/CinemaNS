@@ -19,7 +19,7 @@ its old name deliberately (R-13.8).
 ## Commands
 
 ```
-npm test          # 148 tests, fixtures only, no network
+npm test          # 150 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -129,6 +129,11 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   nested inside a wrapping `<a>`. `.badges` is a flex row with the default
   `align-items: stretch`, so only a direct flex child gets stretched to match
   its siblings' height — a nested badge renders visibly shorter (R-15.4a).
+- The service worker's cache-key `VERSION` (`sw.js`) is derived from
+  `style.css` + `app.js` content by `renderServiceWorker()` in `build.ts`,
+  never a hand-bumped literal — a forgotten manual bump once left returning
+  users on stale cached assets while the network-first HTML had already
+  moved on (R-9.7a).
 
 ## Security (§17)
 

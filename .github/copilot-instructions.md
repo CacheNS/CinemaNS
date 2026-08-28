@@ -105,7 +105,7 @@ These look like trivia, but each one was a real bug. See §10 of
 
 ## Working in this repo
 
-- `npm test` (148 tests, no network — fixtures only) and `npx tsc --noEmit` must
+- `npm test` (150 tests, no network — fixtures only) and `npx tsc --noEmit` must
   both pass before committing.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.
@@ -120,6 +120,11 @@ These look like trivia, but each one was a real bug. See §10 of
   nested inside a wrapping `<a>`. `.badges` is a flex row with the default
   `align-items: stretch`, so only a direct flex child stretches to match its
   siblings' height — nest one and it renders visibly shorter (R-15.4a).
+- The service worker's cache-key `VERSION` (`sw.js`) is derived from
+  `style.css` + `app.js` content by `renderServiceWorker()` in `build.ts`,
+  never a hand-bumped literal — a forgotten manual bump once left returning
+  users on stale cached assets while the network-first HTML had already
+  moved on (R-9.7a).
 
 ## Security (§17)
 
