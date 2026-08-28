@@ -301,6 +301,20 @@ test('is installable as an app', () => {  const today = renderDayPage(snapshot, 
   assert.ok(today.includes('apple-touch-icon'));
 });
 
+// Regression: GitHub Pages serves sw.js with a multi-hour Cache-Control, so a
+// browser can keep re-installing the *previous* worker straight from its own
+// HTTP cache without ever fetching the new bytes — only "clear site data"
+// forced an update (R-9.7b). The page must carry the same build-time asset
+// hash used for the service worker's own cache key, so app.js can tag the
+// registration URL with it and always reach the network on a real change.
+test('the page carries the service worker version for cache-busting registration', () => {
+  const withVersion = renderDayPage(snapshot, '2026-08-19', 'abc123def456');
+  assert.ok(withVersion.includes('<meta name="sw-version" content="abc123def456">'));
+
+  const withoutVersion = renderDayPage(snapshot, '2026-08-19');
+  assert.ok(!withoutVersion.includes('sw-version'));
+});
+
 test('no Cyrillic reaches the rendered page', () => {
   // The site is Latin-only. escapeHtml is the single choke point every string
   // passes through, so converting there makes this structural rather than a

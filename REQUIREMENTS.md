@@ -557,6 +557,20 @@ network-first HTML updated immediately, pairing new markup with old script
 and CSS — until they cleared storage. Hashing removes the step a person can
 forget.
 
+**R-9.7b `sw.js` itself is registered with a version-tagged URL
+(`sw.js?v=<hash>`), because GitHub Pages serves `sw.js` with a multi-hour
+`Cache-Control` that R-9.7a alone cannot see past.** A real incident: right
+after a deploy, a visitor's browser still had the *previous* `sw.js` sitting
+in its own HTTP cache (not Cache Storage), so it kept re-installing the old
+worker — with its old, stale `VERSION` baked in — without ever fetching the
+new bytes over the network; only "clear site data" forced it to update. The
+same content hash computed for R-9.7a (`computeAssetVersion()`) is embedded
+as a `<meta name="sw-version">` in every page's `<head>` and read by
+`registerServiceWorker()` before calling `.register()`. A query string the
+browser has never cached always reaches the network regardless of the
+response header, so a content change is visible on the very next page load
+instead of waiting out the cache lifetime.
+
 **R-9.8** `setupInstall()` and `registerServiceWorker()` must run **before** any
 filter early-return in `app.js`.
 
