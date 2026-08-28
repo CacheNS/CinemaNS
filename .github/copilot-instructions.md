@@ -36,6 +36,10 @@ the repository keeps its old name on purpose until the domain move (R-13.8).
 - **Every city but the default renders pre-hidden; JS only reveals.** Unlike the
   other filters, a no-JS superset here would be actively wrong — a Novi Sad
   reader must never see Belgrade showtimes.
+- **The search box's term lives in the URL (`?q=`), like the other filters.**
+  It filters instantly on keystroke and survives a day-tab switch (a real page
+  navigation) the same way the dubbed/kids checkboxes already do, and the same
+  way the city switch survives by never navigating at all (R-7.9).
 - **All dates are Europe/Belgrade.** Off-by-one days are the classic bug here.
 - **Never present a guessed age rating as fact.** Heuristic ratings are marked
   `confident: false` and shown as such.

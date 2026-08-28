@@ -103,6 +103,9 @@
   var params = new URLSearchParams(window.location.search);
   dubbedInput.checked = params.get('dubbed') === '1';
   kidsInput.checked = params.get('kids') === '1';
+  // Restored verbatim (not folded) so the box shows exactly what was typed;
+  // apply() folds it again on every run for matching.
+  if (searchInput && params.get('q')) searchInput.value = params.get('q');
 
   // An explicit ?grad= wins over the stored preference, so a shared link always
   // shows the sender what they saw; otherwise fall back to last choice.
@@ -232,7 +235,7 @@
     if (empty) empty.hidden = visibleMovies > 0 || dayIsOver;
     if (emptyPast) emptyPast.hidden = !dayIsOver;
 
-    syncUrl(dubbedOnly, kidsOnly);
+    syncUrl(dubbedOnly, kidsOnly, searchInput ? searchInput.value : '');
   }
 
   function plural(n, one, few, many) {
@@ -243,11 +246,16 @@
     return many;
   }
 
-  function syncUrl(dubbedOnly, kidsOnly) {
+  function syncUrl(dubbedOnly, kidsOnly, rawSearch) {
     var next = new URLSearchParams();
     if (city !== defaultCity) next.set('grad', citySlug);
     if (dubbedOnly) next.set('dubbed', '1');
     if (kidsOnly) next.set('kids', '1');
+    // Carried in the URL, not just component state, so it survives the real
+    // page navigation a day-tab click causes (R-7.9) - unlike the city
+    // switch, which never navigates and so needs no such round-trip.
+    var trimmedSearch = (rawSearch || '').trim();
+    if (trimmedSearch) next.set('q', trimmedSearch);
     var query = next.toString();
     var url = window.location.pathname + (query ? '?' + query : '');
     window.history.replaceState(null, '', url);

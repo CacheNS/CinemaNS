@@ -47,6 +47,12 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   evening the page legitimately goes empty.
 - Every city but the default renders pre-hidden and JS only ever *reveals*. A
   no-JS reader must get a correct single-city page, never a mix.
+- A search box above the listing filters `.movie` cards instantly on keystroke,
+  matching Serbian and original title with the same `transliterate()` folding
+  used for cross-cinema matching (R-7.9). Like the other filters (R-7.5), the
+  typed term round-trips through `?q=` in the URL, so it survives a day-tab
+  navigation — which reloads the page — the same way the city switch already
+  survives it by never navigating at all.
 - All dates are Europe/Belgrade.
 - Never present a guessed age rating as fact.
 

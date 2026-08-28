@@ -160,6 +160,12 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
     updates immediately, but the cache-first assets it depends on stay
     stale — which is exactly what happened before this was automated. Don't
     reintroduce a literal `VERSION` string in `sw.js`.
+28. **The search box's term lives in the URL, like the other filters** (§7.9).
+    `syncUrl()` writes the raw typed text to `?q=` and copies it into every
+    day-tab `href`; on load it's read back into the box before the first
+    `apply()`. Without this, the term survived a city switch (JS-intercepted,
+    never navigates) but was silently lost on a day switch (a real page load)
+    — the same class of bug R-7.5 already solved for `dubbed`/`kids`.
 
 ## Before committing
 
