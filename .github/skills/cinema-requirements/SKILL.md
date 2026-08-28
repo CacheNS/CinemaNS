@@ -158,7 +158,7 @@ enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus
 
 ```
 npx tsc --noEmit
-npm test          # 146 tests, fixtures only, no network
+npm test          # 148 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```

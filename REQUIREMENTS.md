@@ -282,6 +282,17 @@ unfiltered. Nothing is broken or empty.
 the UI reports how many were excluded for that reason — a parsing gap must look
 like a parsing gap, not an empty schedule.
 
+**R-7.9 A search box sits directly above the movie listing and filters
+instantly, on every keystroke.** It matches against both the Serbian display
+title and the original title, diacritic- and case-insensitively (folded with
+the same `transliterate()` used for cross-cinema matching, never
+`toSerbianLatin()`), so typing "vajana" or "moana" finds the same card. It is
+not a form submission: like the checkboxes, it hides `.movie` cards in the
+existing filter cascade, so counts, the empty-state message and the no-JS
+fallback (R-7.7) all fall out of the same mechanism. The "day is over" message
+(R-7c) is only shown when the time cutoff is genuinely why the page is empty,
+not when an unmatched search term is.
+
 ---
 
 ## 7b. City switching
@@ -674,7 +685,7 @@ Arena's; a domestic film's showtimes all become `original`.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **146 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **148 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same

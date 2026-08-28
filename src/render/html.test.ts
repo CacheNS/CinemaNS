@@ -202,6 +202,17 @@ test('emits the attributes the filters rely on', () => {
   assert.ok(today.includes('id="filter-kids"'));
 });
 
+test('emits a search box and a folded data-search haystack before the listing', () => {
+  const today = renderDayPage(snapshot, '2026-08-19');
+  assert.ok(today.includes('id="movie-search"'));
+  // The box must appear before the movie listing so it reads as a filter for
+  // it, not an unrelated control elsewhere on the page.
+  assert.ok(today.indexOf('id="movie-search"') < today.indexOf('id="movies"'));
+  // Folded lowercase, and covering both the local and the original title, so
+  // typing either "Vajana" or "Moana" matches the same card.
+  assert.ok(today.includes('data-search="vajana moana 2"'));
+});
+
 test('escapes titles coming from the cinemas', () => {
   const page = renderDayPage(snapshot, '2026-08-20');
   assert.ok(!page.includes('<script>'));
@@ -309,6 +320,9 @@ test('no Cyrillic reaches the rendered page', () => {
   assert.doesNotMatch(html, /[\u0400-\u04FF]/, 'page must contain no Cyrillic');
   assert.match(html, /Spajdermen: Novi dan/);
   assert.match(html, /Naučna fantastika/);
+  // The search haystack folds Cyrillic to plain lowercase Latin too, so a
+  // reader who types with a Latin keyboard still matches the Cyrillic title.
+  assert.ok(html.includes('data-search="spajdermen: novi dan moana 2"'));
 });
 
 test('escapeHtml converts Cyrillic while still escaping markup', () => {

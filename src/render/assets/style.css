@@ -151,6 +151,30 @@ main {
   margin: 0 0 1rem;
 }
 
+.search {
+  margin-bottom: 1rem;
+}
+
+.search__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: inherit;
+  font-size: 0.95rem;
+}
+
+.search__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.search__input::placeholder {
+  color: var(--muted);
+}
+
 .notice {
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);

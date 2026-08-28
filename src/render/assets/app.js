@@ -16,6 +16,7 @@
 
   var dubbedInput = document.getElementById('filter-dubbed');
   var kidsInput = document.getElementById('filter-kids');
+  var searchInput = document.getElementById('movie-search');
   var empty = document.getElementById('empty');
   var emptyPast = document.getElementById('empty-past');
   var cityNav = document.getElementById('cities');
@@ -54,6 +55,27 @@
   function toMinutes(text) {
     if (!text || !/^\d{2}:\d{2}$/.test(text)) return -1;
     return Number(text.slice(0, 2)) * 60 + Number(text.slice(3, 5));
+  }
+
+  // Folds a typed query the same way the server folds each movie's
+  // data-search haystack (see transliterate() in core/titles.ts): lowercase,
+  // the five Serbian Latin diacritics mapped explicitly since đ has no
+  // precomposed NFD decomposition, then NFD-strip any other accents so a
+  // plain-typed query still matches an accented original title.
+  var LATIN_DIACRITICS = { č: 'c', ć: 'c', ž: 'z', š: 's', đ: 'dj' };
+  function foldSearchText(text) {
+    var lower = String(text || '').toLowerCase();
+    var out = '';
+    for (var i = 0; i < lower.length; i++) {
+      var ch = lower.charAt(i);
+      out += LATIN_DIACRITICS[ch] || ch;
+    }
+    try {
+      out = out.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    } catch (err) {
+      /* normalize() unsupported: fall back to the un-stripped fold */
+    }
+    return out.trim();
   }
 
   /** Cutoff in minutes since midnight, or null when nothing should be hidden. */
@@ -131,6 +153,7 @@
   function apply() {
     var dubbedOnly = dubbedInput.checked;
     var kidsOnly = kidsInput.checked;
+    var searchTerm = searchInput ? foldSearchText(searchInput.value) : '';
     var visibleMovies = 0;
     var visibleShowtimes = 0;
     var unknownAudio = 0;
@@ -144,6 +167,13 @@
       var movie = movies[i];
 
       if (kidsOnly && movie.getAttribute('data-kid-friendly') !== '1') {
+        movie.hidden = true;
+        continue;
+      }
+
+      // Instant substring match against the pre-folded title+original-title
+      // haystack, so it filters titles regardless of case or diacritics.
+      if (searchTerm && (movie.getAttribute('data-search') || '').indexOf(searchTerm) === -1) {
         movie.hidden = true;
         continue;
       }
@@ -198,7 +228,7 @@
     // "Nothing found" and "the day is over" are different facts. The second is
     // only claimed when the time filter is genuinely the reason, so it is not
     // shown when the user's own filters emptied the page.
-    var dayIsOver = visibleMovies === 0 && hidPast && !dubbedOnly && !kidsOnly;
+    var dayIsOver = visibleMovies === 0 && hidPast && !dubbedOnly && !kidsOnly && !searchTerm;
     if (empty) empty.hidden = visibleMovies > 0 || dayIsOver;
     if (emptyPast) emptyPast.hidden = !dayIsOver;
 
@@ -244,6 +274,7 @@
   }
 
   form.addEventListener('change', apply);
+  if (searchInput) searchInput.addEventListener('input', apply);
   apply();
 
   // A page left open should not keep advertising a screening that has aged out,
