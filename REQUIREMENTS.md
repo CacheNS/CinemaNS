@@ -291,7 +291,11 @@ not a form submission: like the checkboxes, it hides `.movie` cards in the
 existing filter cascade, so counts, the empty-state message and the no-JS
 fallback (R-7.7) all fall out of the same mechanism. The "day is over" message
 (R-7c) is only shown when the time cutoff is genuinely why the page is empty,
-not when an unmatched search term is.
+not when an unmatched search term is. Like the other filters (R-7.5), the
+typed term is carried in the URL query string (`?q=`) so it survives day-tab
+navigation — the box itself is client-side state that would otherwise be lost
+on the real page load a day switch causes, unlike the city switch, which never
+navigates.
 
 ---
 
