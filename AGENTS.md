@@ -19,7 +19,7 @@ its old name deliberately (R-13.8).
 ## Commands
 
 ```
-npm test          # 146 tests, fixtures only, no network
+npm test          # 148 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000

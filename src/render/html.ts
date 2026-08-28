@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { formatDayLabel, formatDayShort, formatTimestamp } from '../core/dates.js';
 import { trailerLink } from '../core/trailer.js';
-import { toSerbianLatin } from '../core/titles.js';
+import { toSerbianLatin, transliterate } from '../core/titles.js';
 import { CINEMAS, CITIES, DEFAULT_CITY, cityById } from '../core/types.js';
 import type { Movie, Showtime, Snapshot } from '../core/types.js';
 
@@ -400,6 +400,14 @@ function renderMovie(movie: Movie, date: string): string {
   const cities = [...new Set(byCinema.map((entry) => CINEMAS[entry.cinemaId].city))];
   const hidden = cities.includes(DEFAULT_CITY) ? '' : ' hidden';
 
+  // Folded to lowercase Latin ASCII with diacritics stripped, so the client
+  // can match a plain-typed query against Serbian and English titles alike
+  // without re-implementing transliteration — see core/titles.ts.
+  const searchText = [movie.title, movie.originalTitle]
+    .filter((title): title is string => Boolean(title))
+    .map((title) => transliterate(title).toLowerCase())
+    .join(' ');
+
   const trailer = trailerLink(movie);
   const posterSrc = movie.posterUrl ? safeUrl(movie.posterUrl) : undefined;
   const posterImage = posterSrc
@@ -424,7 +432,8 @@ function renderMovie(movie: Movie, date: string): string {
              data-min-age="${minAge}"
              data-cities="${cities.join(' ')}"
              data-has-dubbed="${hasDubbed ? '1' : '0'}"
-             data-rating-confident="${movie.ageRating?.confident ? '1' : '0'}"${hidden}>
+             data-rating-confident="${movie.ageRating?.confident ? '1' : '0'}"
+             data-search="${escapeHtml(searchText)}"${hidden}>
       <div class="movie__poster">${poster}</div>
       <div class="movie__body">
         <h2 class="movie__title">${escapeHtml(movie.title)}${
@@ -640,6 +649,11 @@ export function renderDayPage(snapshot: Snapshot, date: string): string {
     ${renderSourceNotices(snapshot)}
     ${emptyState}
     ${pastState}
+
+    <div class="search">
+      <input type="search" class="search__input" id="movie-search"
+             placeholder="Pretraga filmova…" aria-label="Pretraga filmova" autocomplete="off">
+    </div>
 
     <div class="movies" id="movies" data-date="${escapeHtml(date)}">${cards}
     </div>
