@@ -271,30 +271,51 @@ source age from the cinemas.
 
 ## 7. Filtering
 
-**R-7.1** Two independent filters, usable simultaneously:
-**"Sinhronizovano"** and **"Za decu"**.
+**R-7.1** Two independent controls, usable simultaneously: a three-state
+**audio** control and the **"Za decu"** checkbox.
+
+**R-7.1a The audio control is one radio group, not a pair of checkboxes.**
+Its three states are **"Svi"** (no audio filtering), **"Sinhro."** (only
+`dubbed`) and **"Bez sinhro."** (everything *except* `dubbed`). A single
+`name="audio"` makes them mutually exclusive with no JavaScript, and it gives
+arrow-key navigation for free — two checkboxes would have allowed the
+meaningless "dubbed-only *and* subtitled-only" combination and needed code to
+forbid it.
+
+**R-7.1b "Bez sinhro." hides only a confirmed `dubbed` chip.** `subtitled`,
+`original` (domaći film, R-10.5.1) and `unknown` all stay visible. The reader
+asking for "not dubbed" wants a domestic Serbian film included — it is not
+dubbed — and hiding an `unknown` chip here would silently drop a screening
+over a parsing gap rather than a stated fact. Labelling this state "Titlovano"
+would therefore be wrong, which is why it is not.
 
 **R-7.2 Dubbing is per-showtime, not per-film.** The same film runs dubbed in
 the afternoon and subtitled in the evening.
 
-**R-7.3** Therefore the dubbed filter hides **individual showtime chips**, then
+**R-7.3** Therefore the audio filter hides **individual showtime chips**, then
 hides cinema blocks and movie cards left with nothing visible. Filtering only at
 the card level is a defect — it would show a card whose listed times are
 actually subtitled.
 
 **R-7.4** "Za decu" is a movie-level property and hides whole cards.
 
-**R-7.5** Filter state lives in the URL query string (`?dubbed=1&kids=1`) so a
-filtered view is linkable and survives day-tab navigation.
+**R-7.5** Filter state lives in the URL query string
+(`?audio=dubbed|subtitled&kids=1&q=…`) so a filtered view is linkable and
+survives day-tab navigation. Any other `?audio=` value falls back to "Svi".
+The earlier boolean `?dubbed=1` is **deliberately not accepted** — it was
+never published beyond this repository, and one filter must have exactly one
+representation in the URL.
 
 **R-7.6** A live count ("N filmova / M projekcija") updates with the filters.
 
 **R-7.7 No-JS fallback.** With JavaScript disabled everything is shown
 unfiltered. Nothing is broken or empty.
 
-**R-7.8** `audio: 'unknown'` showtimes are excluded by the dubbed filter, but
-the UI reports how many were excluded for that reason — a parsing gap must look
-like a parsing gap, not an empty schedule.
+**R-7.8** `audio: 'unknown'` showtimes are excluded by the **"Sinhro."** state,
+and only then does the UI report how many were excluded for that reason — a
+parsing gap must look like a parsing gap, not an empty schedule. The notice is
+suppressed in the other two states because those show the unknown chips, so it
+would be describing screenings that are on screen (R-7.1b).
 
 **R-7.9 A search box sits directly above the movie listing and filters
 instantly, on every keystroke.** It matches against both the Serbian display
@@ -328,7 +349,7 @@ poster image.
 
 **R-7b.3 City is a property of the cinema block**, so the switch is one extra
 condition inside the existing `apply()` loop rather than a second mechanism.
-Card-hiding then falls out for free, exactly as it does for the dubbed filter
+Card-hiding then falls out for free, exactly as it does for the audio filter
 (R-7.3).
 
 **R-7b.4 The non-default city is rendered with `hidden` already set, and JS
@@ -398,9 +419,9 @@ otherwise have seen.
 **R-7c.7 When the whole day has aged out**, the page says so and links to
 tomorrow, rather than showing the generic "nothing found" message. That message
 is only used when the time filter is genuinely the cause — if the reader's own
-dubbed/kids filters emptied the page, the generic message still applies. Late in
-the evening today's page legitimately goes empty; that is the correct answer,
-not a bug.
+audio/kids filters or search term emptied the page, the generic message still
+applies. Late in the evening today's page legitimately goes empty; that is the
+correct answer, not a bug.
 
 **R-7c.8 A page left open re-filters itself.** The cutoff is re-evaluated every
 minute and `apply()` runs only when it actually moves.

@@ -41,8 +41,12 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   specifically to have nothing to keep alive.
 - TMDb is enrichment, never a hard dependency: the build must fully succeed with
   no API key (it currently runs without one).
-- Dubbing is a property of the **showtime**, not the film, so the dubbed filter
+- Dubbing is a property of the **showtime**, not the film, so the audio filter
   hides individual chips before emptying cards.
+- The audio filter is a **single three-state radio group** (`?audio=`), not a
+  pair of checkboxes: Svi / Sinhro. / Bez sinhro. (R-7.1a). "Bez sinhro."
+  hides only a confirmed `dubbed` chip — `subtitled`, `original` and `unknown`
+  all survive it, which is exactly why it is not called "Titlovano" (R-7.1b).
 - `CinemaId` identifies a **venue**, not a chain — Beograd has five Cineplexx
   venues, and collapsing them would merge Delta City with Galerija. Chain-level
   facts (metadata trust) live on `Cinema.chain`.

@@ -145,6 +145,49 @@ main {
 
 .filter input { accent-color: var(--accent); margin: 0; }
 
+/* Three pills, one radio group: the radio carries the state, the pill shows it. */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.segmented__option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Visually hidden but still focusable and announced, so the pill can own the look. */
+.segmented__option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.segmented__option:has(input:checked) {
+  border-color: var(--accent);
+  background: rgba(255, 201, 77, 0.14);
+}
+
+.segmented__option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .counts {
   color: var(--muted);
   font-size: 0.85rem;

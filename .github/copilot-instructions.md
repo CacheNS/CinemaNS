@@ -27,8 +27,13 @@ build timestamp is the only exact freshness claim.
   with no API key — titles then merge by fuzzy matching and age badges read
   "Uzrast nepoznat".
 - **Dubbing is a property of the showtime, not the film.** The same film runs
-  dubbed in the afternoon and subtitled in the evening, so the dubbed filter
+  dubbed in the afternoon and subtitled in the evening, so the audio filter
   hides individual chips and only then empties cards.
+- **The audio filter is one radio group with three states** — Svi / Sinhro. /
+  Bez sinhro. (`?audio=`, R-7.1a). "Bez sinhro." hides only a confirmed
+  `dubbed` chip, so `subtitled`, `original` (domaći) and `unknown` all stay
+  visible; that is why it is not labelled "Titlovano" (R-7.1b). The
+  unknown-language notice belongs to the dubbed state alone (R-7.8).
 - **Today's page hides screenings that have already started**, strictly and in
   the browser (Belgrade time, today only). The chains disagree about how much of
   the past they publish, so this consistency is our rule, not theirs — and late
@@ -43,7 +48,7 @@ build timestamp is the only exact freshness claim.
   reader must never see Belgrade showtimes.
 - **The search box's term lives in the URL (`?q=`), like the other filters.**
   It filters instantly on keystroke and survives a day-tab switch (a real page
-  navigation) the same way the dubbed/kids checkboxes already do, and the same
+  navigation) the same way the audio/kids controls already do, and the same
   way the city switch survives by never navigating at all (R-7.9).
 - **All dates are Europe/Belgrade.** Off-by-one days are the classic bug here.
 - **Never present a guessed age rating as fact.** Heuristic ratings are marked

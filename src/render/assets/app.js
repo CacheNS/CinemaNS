@@ -14,7 +14,7 @@
 
   if (!form || !container || !counts) return;
 
-  var dubbedInput = document.getElementById('filter-dubbed');
+  var audioInputs = form.querySelectorAll('input[name="audio"]');
   var kidsInput = document.getElementById('filter-kids');
   var searchInput = document.getElementById('movie-search');
   var empty = document.getElementById('empty');
@@ -100,8 +100,24 @@
     if (cityTabs[c].getAttribute('aria-current') === 'page') defaultCity = id;
   }
 
+  /** '' (any language), 'dubbed' or 'subtitled' - whichever radio is checked. */
+  function selectedAudio() {
+    for (var a = 0; a < audioInputs.length; a++) {
+      if (audioInputs[a].checked) return audioInputs[a].value;
+    }
+    return '';
+  }
+
+  /** Anything but the two known modes falls back to the unfiltered "Sve" option. */
+  function selectAudio(value) {
+    var wanted = value === 'dubbed' || value === 'subtitled' ? value : '';
+    for (var a = 0; a < audioInputs.length; a++) {
+      audioInputs[a].checked = audioInputs[a].value === wanted;
+    }
+  }
+
   var params = new URLSearchParams(window.location.search);
-  dubbedInput.checked = params.get('dubbed') === '1';
+  selectAudio(params.get('audio'));
   kidsInput.checked = params.get('kids') === '1';
   // Restored verbatim (not folded) so the box shows exactly what was typed;
   // apply() folds it again on every run for matching.
@@ -154,7 +170,7 @@
   }
 
   function apply() {
-    var dubbedOnly = dubbedInput.checked;
+    var audioMode = selectedAudio();
     var kidsOnly = kidsInput.checked;
     var searchTerm = searchInput ? foldSearchText(searchInput.value) : '';
     var visibleMovies = 0;
@@ -201,9 +217,16 @@
           var start = toMinutes(showtime.getAttribute('data-time'));
           var past = cutoff !== null && start >= 0 && start < cutoff;
           if (past) hidPast = true;
-          var unknown = !past && showtime.getAttribute('data-audio') === 'unknown';
+          var audio = showtime.getAttribute('data-audio');
+          var unknown = !past && audio === 'unknown';
           if (unknown) unknownAudio++;
-          var hide = past || (dubbedOnly && showtime.getAttribute('data-audio') !== 'dubbed');
+          // "Bez sinhronizacije" hides only a confirmed dubbed chip, so domaći
+          // films and chips with no stated language stay visible.
+          var wrongAudio =
+            audioMode === 'dubbed'
+              ? audio !== 'dubbed'
+              : audioMode === 'subtitled' && audio === 'dubbed';
+          var hide = past || wrongAudio;
           showtime.hidden = hide;
           if (!hide) shownInCinema++;
         }
@@ -221,7 +244,9 @@
     var text = visibleMovies + ' ' + plural(visibleMovies, 'film', 'filma', 'filmova') +
       ' · ' + visibleShowtimes + ' ' + plural(visibleShowtimes, 'projekcija', 'projekcije', 'projekcija');
 
-    if (dubbedOnly && unknownAudio > 0) {
+    // Only the dubbed mode hides unknown-language chips - the other two show them,
+    // so the notice would be describing screenings that are right there on screen.
+    if (audioMode === 'dubbed' && unknownAudio > 0) {
       text += ' · ' + unknownAudio + ' ' +
         plural(unknownAudio, 'projekcija nema', 'projekcije nemaju', 'projekcija nema') +
         ' naznačen jezik i nisu prikazane';
@@ -231,11 +256,11 @@
     // "Nothing found" and "the day is over" are different facts. The second is
     // only claimed when the time filter is genuinely the reason, so it is not
     // shown when the user's own filters emptied the page.
-    var dayIsOver = visibleMovies === 0 && hidPast && !dubbedOnly && !kidsOnly && !searchTerm;
+    var dayIsOver = visibleMovies === 0 && hidPast && !audioMode && !kidsOnly && !searchTerm;
     if (empty) empty.hidden = visibleMovies > 0 || dayIsOver;
     if (emptyPast) emptyPast.hidden = !dayIsOver;
 
-    syncUrl(dubbedOnly, kidsOnly, searchInput ? searchInput.value : '');
+    syncUrl(audioMode, kidsOnly, searchInput ? searchInput.value : '');
   }
 
   function plural(n, one, few, many) {
@@ -246,10 +271,10 @@
     return many;
   }
 
-  function syncUrl(dubbedOnly, kidsOnly, rawSearch) {
+  function syncUrl(audioMode, kidsOnly, rawSearch) {
     var next = new URLSearchParams();
     if (city !== defaultCity) next.set('grad', citySlug);
-    if (dubbedOnly) next.set('dubbed', '1');
+    if (audioMode) next.set('audio', audioMode);
     if (kidsOnly) next.set('kids', '1');
     // Carried in the URL, not just component state, so it survives the real
     // page navigation a day-tab click causes (R-7.9) - unlike the city

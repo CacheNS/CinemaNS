@@ -285,7 +285,7 @@ function renderCinemaBlock(
   const cinema = CINEMAS[cinemaId];
   // Pre-hidden for every city but the default. Without JS the page would
   // otherwise show Beograd's showtimes to a Novi Sad reader, which is worse
-  // than showing too few: the dubbed filter degrades to a harmless superset,
+  // than showing too few: the audio filter degrades to a harmless superset,
   // but a mixed-city listing is simply wrong.
   const hidden = cinema.city === DEFAULT_CITY ? '' : ' hidden';
   return `
@@ -635,10 +635,21 @@ export function renderDayPage(snapshot: Snapshot, date: string, swVersion = ''):
     <div class="toolbar">
       <h2 class="toolbar__day">${escapeHtml(formatDayLabel(date, days[0]))}</h2>
       <form class="filters" id="filters">
-        <label class="filter">
-          <input type="checkbox" id="filter-dubbed" name="dubbed" value="1">
-          <span>Samo sinhronizovano</span>
-        </label>
+        <div class="segmented" role="group" aria-label="Jezik projekcije">
+          <label class="segmented__option">
+            <input type="radio" name="audio" id="audio-all" value="" checked>
+            <span>Svi</span>
+          </label>
+          <label class="segmented__option">
+            <input type="radio" name="audio" id="audio-dubbed" value="dubbed">
+            <span>Sinhro.</span>
+          </label>
+          <label class="segmented__option"
+                 title="Titlovano, domaći filmovi i projekcije bez naznačenog jezika">
+            <input type="radio" name="audio" id="audio-subtitled" value="subtitled">
+            <span>Bez sinhro.</span>
+          </label>
+        </div>
         <label class="filter">
           <input type="checkbox" id="filter-kids" name="kids" value="1">
           <span>Za decu</span>

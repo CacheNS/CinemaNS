@@ -135,7 +135,7 @@ test('offers every city, with the default one selected', () => {
 });
 
 // Without JS the page must be a correct single-city page: a superset is fine
-// for the dubbed filter but plainly wrong for city.
+// for the audio filter but plainly wrong for city.
 test('only the default city is visible before JS runs', () => {
   const today = renderDayPage(snapshot, '2026-08-19');
   const blocks = today.match(/<div class="cinema"[^>]*>/g) ?? [];
@@ -198,8 +198,45 @@ test('emits the attributes the filters rely on', () => {
   assert.ok(today.includes('data-min-age="0"'));
   assert.ok(today.includes('data-audio="dubbed"'));
   assert.ok(today.includes('data-audio="subtitled"'));
-  assert.ok(today.includes('id="filter-dubbed"'));
   assert.ok(today.includes('id="filter-kids"'));
+});
+
+test('the audio filter is one radio group with an unfiltered default', () => {
+  const today = renderDayPage(snapshot, '2026-08-19');
+  assert.ok(today.includes('id="audio-all"'));
+  assert.ok(today.includes('id="audio-dubbed"'));
+  assert.ok(today.includes('id="audio-subtitled"'));
+  // One name for all three is what makes the three states mutually exclusive
+  // without any JS, so a checkbox pair can never re-appear by accident.
+  assert.equal(today.match(/name="audio"/g)?.length, 3);
+  assert.ok(today.includes('<input type="radio" name="audio" id="audio-all" value="" checked>'));
+  // The old boolean contract is gone: no checkbox, and no ?dubbed=1 to read.
+  assert.ok(!today.includes('id="filter-dubbed"'));
+});
+
+test('renders data-audio for original and unknown, which the subtitled mode keeps', () => {
+  // "Bez sinhronizacije" hides only `dubbed`, so these two values have to reach
+  // the DOM for the client to have anything left to show.
+  const mixed: Snapshot = {
+    ...snapshot,
+    movies: snapshot.movies.map((movie, index) =>
+      index === 0
+        ? {
+            ...movie,
+            showtimes: movie.showtimes.map((showtime, i) =>
+              i === 0
+                ? { ...showtime, audio: 'original' as const }
+                : i === 1
+                  ? { ...showtime, audio: 'unknown' as const }
+                  : showtime,
+            ),
+          }
+        : movie,
+    ),
+  };
+  const today = renderDayPage(mixed, '2026-08-19');
+  assert.ok(today.includes('data-audio="original"'));
+  assert.ok(today.includes('data-audio="unknown"'));
 });
 
 test('emits a search box and a folded data-search haystack before the listing', () => {

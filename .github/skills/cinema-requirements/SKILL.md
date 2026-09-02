@@ -56,7 +56,12 @@ claim an hourly refresh** (R-2.6a).
    (§5.3). It currently runs without one.
 3. **Dubbing is per-showtime.** Filtering at the card level shows cards whose
    listed times are actually subtitled — the exact mistake a parent gets burned
-   by (§7.2–7.3).
+   by (§7.2–7.3). The control is **one radio group with three states** — Svi /
+   Sinhro. / Bez sinhro., carried as `?audio=` (§7.1a). "Bez sinhro." hides only
+   a confirmed `dubbed` chip, so `subtitled`, `original` and `unknown` all stay
+   visible — do not relabel it "Titlovano" and do not make it hide `unknown`
+   (§7.1b). The unknown-language notice belongs to the dubbed state alone
+   (§7.8). There is no `?dubbed=1` fallback; do not add one back.
 4. **Metadata trust order is cineplexx → cinestar → tuck → arena** (§10.3).
    Arena's film page is positional prose, so it yields the *director* when a
    film has no original title, and it rounds runtimes. Tuck labels its fields
@@ -170,7 +175,7 @@ claim an hourly refresh** (R-2.6a).
     day-tab `href`; on load it's read back into the box before the first
     `apply()`. Without this, the term survived a city switch (JS-intercepted,
     never navigates) but was silently lost on a day switch (a real page load)
-    — the same class of bug R-7.5 already solved for `dubbed`/`kids`.
+    — the same class of bug R-7.5 already solved for `audio`/`kids`.
 29. **`sw.js` is registered as `sw.js?v=<hash>`, not bare `sw.js`** (§9.7b).
     GitHub Pages serves `sw.js` itself with a multi-hour `Cache-Control`, so a
     browser can keep re-fetching the *previous* worker straight from its own
