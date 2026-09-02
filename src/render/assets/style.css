@@ -449,6 +449,15 @@ main {
 .showtime--dubbed { border-color: rgba(110, 231, 168, 0.35); }
 .showtime--original { border-color: rgba(196, 181, 253, 0.35); }
 
+/* Already started, still inside the grace window - muted, but not struck
+   through: the chip is a working booking link and often still sells. */
+.showtime[data-started] {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.showtime[data-started]:hover { opacity: 1; }
+
 .footer {
   max-width: 1080px;
   margin: 2.5rem auto 0;

@@ -76,8 +76,9 @@ claim an hourly refresh** (R-2.6a).
 7. **`DS` is not a dubbing marker; CineStar's `.age` is genre** (§10.6–10.7).
 8. **Parse Arena by DOM label, not body regex** — its rows run together
    (§10.8).
-9. **Europe/Belgrade for every date** (§4.6), and today's page hides screenings
-   that have already started — strictly, client-side, today only (§7c).
+9. **Europe/Belgrade for every date** (§4.6), and today's page keeps a screening
+   for 60 minutes after it starts, then hides it — client-side, today only, with
+   the still-listed ones muted via `data-started` (§7c).
 10. **Arena's `00:00` rows with an id-less `/numSale/index/` booking link are
     placeholders.** Drop them by the missing id, never by the time (§10.7a).
 11. **Every booking chip must reach a page that can sell that ticket** (§8.1a).
@@ -253,8 +254,11 @@ change isn't finished yet.
 - **Cross-venue inconsistency about past screenings is fixed on our side**
   (§7c), because it is upstream policy: measured at 23:17, Cineplexx had pruned
   to the next screening, CineStar still listed 16:00, and Arena had dropped the
-  day. Today's page hides anything already started, strictly and client-side, so
-  a late-evening page going empty is the correct answer, not a bug.
+  day. Today's page keeps a screening for an hour after it starts and then hides
+  it, client-side, so a late-evening page going empty is the correct answer, not
+  a bug. The grace period exists because you can still walk into a film that
+  began twenty minutes ago; those chips are muted, never struck through, because
+  they are working booking links (§7c.2a).
 - **Both cities share one page on purpose** (§7b.2). The payload objection was
   measured, not assumed: measured on production, a full day page carrying both
   cities is 157 KB raw but **10.0 KB over the wire** (15.7× gzip, and GitHub

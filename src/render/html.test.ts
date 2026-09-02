@@ -273,6 +273,12 @@ test('emits what the past-showtime filter needs to work', () => {
   // The end-of-day message ships hidden and is revealed only by the script.
   assert.match(today, /id="empty-past"[^>]*hidden/);
   assert.ok(today.includes('data-daylink'));
+  // With a grace period the page no longer empties the moment the last film
+  // starts, so the message must not claim that everything has already begun.
+  assert.ok(today.includes('Za danas više nema projekcija.'));
+  assert.ok(!today.includes('već počele'));
+  // The label for a started-but-still-listed chip is markup, not JS copy.
+  assert.ok(today.includes('data-started-label="već počelo"'));
 });
 
 test('warns about stale sources', () => {

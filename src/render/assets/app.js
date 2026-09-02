@@ -78,14 +78,36 @@
     return out.trim();
   }
 
-  /** Cutoff in minutes since midnight, or null when nothing should be hidden. */
+  /**
+   * Cutoff in minutes since midnight, or null when nothing should be hidden.
+   * A screening survives its own start time by GRACE_MINUTES: you can still
+   * walk into a film that began twenty minutes ago, and the cinemas keep
+   * selling those tickets.
+   */
+  var GRACE_MINUTES = 60;
   function pastCutoff() {
     if (!pageDate) return null;
     var now = belgradeNow();
     // Only the current day prunes. A past day is left intact so a stale or
     // shared link still reads as a record of that day rather than an empty page.
     if (!now || now.date !== pageDate) return null;
-    return toMinutes(now.time);
+    // Goes negative in the first hour after midnight, which correctly hides nothing.
+    return toMinutes(now.time) - GRACE_MINUTES;
+  }
+
+  // Kept in the rendered HTML so this file carries no display copy of its own.
+  var startedLabel = container.getAttribute('data-started-label') || '';
+
+  /** Flags a screening that has begun but is still inside the grace window. */
+  function markStarted(showtime, started) {
+    if (started === showtime.hasAttribute('data-started')) return;
+    if (started) {
+      showtime.setAttribute('data-started', '1');
+      if (startedLabel) showtime.title += ' · ' + startedLabel;
+    } else {
+      showtime.removeAttribute('data-started');
+      if (startedLabel) showtime.title = showtime.title.replace(' · ' + startedLabel, '');
+    }
   }
 
   // The city tabs are the registry: each carries its id and its slug, so the
@@ -217,6 +239,10 @@
           var start = toMinutes(showtime.getAttribute('data-time'));
           var past = cutoff !== null && start >= 0 && start < cutoff;
           if (past) hidPast = true;
+          markStarted(
+            showtime,
+            cutoff !== null && !past && start >= 0 && start < cutoff + GRACE_MINUTES,
+          );
           var audio = showtime.getAttribute('data-audio');
           var unknown = !past && audio === 'unknown';
           if (unknown) unknownAudio++;

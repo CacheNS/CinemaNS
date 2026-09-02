@@ -52,10 +52,12 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   facts (metadata trust) live on `Cinema.chain`.
 - City is a property of the **cinema block**, so switching city reuses the same
   `apply()` loop as the filters.
-- **Today's page hides screenings that have already started**, strictly and in
-  the browser — the chains disagree about how much of the past they publish, so
-  consistency is our rule, not theirs. Belgrade time, today only, so late in the
-  evening the page legitimately goes empty.
+- **Today's page keeps a screening for 60 minutes after it starts**, then hides
+  it — in the browser, Belgrade time, today only (`GRACE_MINUTES`, R-7c.2). The
+  chains disagree about how much of the past they publish, so consistency is our
+  rule, not theirs. A chip inside the grace window is muted via `data-started`
+  (R-7c.2a) rather than struck through, since it is still a live booking link.
+  Late in the evening the page legitimately goes empty.
 - Every city but the default renders pre-hidden and JS only ever *reveals*. A
   no-JS reader must get a correct single-city page, never a mix.
 - A search box above the listing filters `.movie` cards instantly on keystroke,

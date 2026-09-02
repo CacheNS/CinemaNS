@@ -574,7 +574,7 @@ export function renderDayPage(snapshot: Snapshot, date: string, swVersion = ''):
   const tomorrowLink = tomorrow
     ? ` <a href="${escapeHtml(tomorrow)}.html" data-daylink>Pogledajte sutrašnji repertoar.</a>`
     : '';
-  const pastState = `<p class="empty" id="empty-past" hidden>Sve današnje projekcije su već počele.${tomorrowLink}</p>`;
+  const pastState = `<p class="empty" id="empty-past" hidden>Za danas više nema projekcija.${tomorrowLink}</p>`;
 
   const dayLabel = formatDayLabel(date, days[0]);
   const canonicalUrl = pageUrl(date, days);
@@ -670,7 +670,7 @@ export function renderDayPage(snapshot: Snapshot, date: string, swVersion = ''):
              placeholder="Pretraga filmova…" aria-label="Pretraga filmova" autocomplete="off">
     </div>
 
-    <div class="movies" id="movies" data-date="${escapeHtml(date)}">${cards}
+    <div class="movies" id="movies" data-date="${escapeHtml(date)}" data-started-label="već počelo">${cards}
     </div>
   </main>
 

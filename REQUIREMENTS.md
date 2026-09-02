@@ -374,7 +374,7 @@ JS, a `<noscript>` note says so rather than leaving a dead control.
 **R-7b.8 Merging is global, not per city.** A film playing in both cities is one
 `Movie` carrying showtimes from both; the split happens at render. This roughly
 halves TMDb lookups, which matters because TMDb is rate-limited and the build
-runs hourly.
+repeats on every scheduled run.
 
 **R-7b.9 Accepted trade-off:** a single combined page cannot have a
 city-specific `<title>`/`<h1>`, so it will not rank for "bioskopi u beogradu".
@@ -386,24 +386,37 @@ deep-link into the combined page — not to abandon the combined page.
 
 ## 7c. Past showtimes
 
-**R-7c.1 Today's page hides screenings that have already started**, so all
-venues read consistently. This is our rule, not the sites' — measured at 23:17
-Belgrade, Cineplexx had pruned to the next screening, CineStar was still listing
-16:00, and Arena had dropped the day entirely. The inconsistency is upstream
-policy, so it cannot be fixed in an adapter.
+**R-7c.1 Today's page hides screenings that started more than an hour ago**, so
+all venues read consistently. This is our rule, not the sites' — measured at
+23:17 Belgrade, Cineplexx had pruned to the next screening, CineStar was still
+listing 16:00, and Arena had dropped the day entirely. The inconsistency is
+upstream policy, so it cannot be fixed in an adapter.
 
-**R-7c.2 A strict cutoff, no grace period.** A screening is hidden the minute
-it starts. The page answers "what can I still go to", so a listing you can no
-longer buy a ticket for is noise.
+**R-7c.2 A 60-minute grace period, not a strict cutoff.** A screening stays
+listed for one hour after its start time (`GRACE_MINUTES` in `app.js`). You can
+still walk into a film that began twenty minutes ago and the cinemas are still
+selling those seats, so hiding it on the minute answered the wrong question.
+The boundary is inclusive: a screening exactly 60 minutes old is still shown.
+
+**R-7c.2a A screening inside the grace window is visibly marked**, because
+otherwise the reader cannot tell that a listed 19:15 film is already 40 minutes
+in. The client sets `data-started` on the chip and `.showtime[data-started]`
+mutes it (`opacity: .55`, dashed border, restored on hover). It is deliberately
+not struck through — the chip is a working booking link that often still sells.
+The wording comes from `data-started-label` on `#movies`, not from `app.js`, so
+the script holds no display copy; it is appended to the chip's existing `title`
+and removed again when the screening ages out.
 
 **R-7c.3 Today only.** Past days are left intact, so a shared or cached link to
 an earlier day still reads as a record of that day rather than an empty page.
 The page states its own date (`data-date` on `#movies`) and the client compares
-it with the current Belgrade date; they differ, no filtering happens.
+it with the current Belgrade date; they differ, no filtering happens — and no
+chip is marked either (R-7c.2a). In the first hour after midnight the cutoff
+goes negative on today's page, which correctly hides nothing.
 
-**R-7c.4 Client-side, not build-time.** Builds run hourly and the service worker
-caches HTML, so a build-time cutoff would bake in a timestamp and leave up to an
-hour of started screenings on a fresh page — and far more on a cached one.
+**R-7c.4 Client-side, not build-time.** Builds are hours apart (R-2.6a) and the
+service worker caches HTML, so a build-time cutoff would bake in a timestamp and
+leave hours of started screenings on a fresh page — more still on a cached one.
 Filtering in the browser is correct to the minute even on a stale page.
 
 **R-7c.5 Europe/Belgrade, never the visitor's zone** (R-2.6). A reader in London
@@ -417,14 +430,17 @@ unknown-audio count (R-7.8) so the notice describes only what the reader could
 otherwise have seen.
 
 **R-7c.7 When the whole day has aged out**, the page says so and links to
-tomorrow, rather than showing the generic "nothing found" message. That message
-is only used when the time filter is genuinely the cause — if the reader's own
-audio/kids filters or search term emptied the page, the generic message still
-applies. Late in the evening today's page legitimately goes empty; that is the
-correct answer, not a bug.
+tomorrow, rather than showing the generic "nothing found" message. The wording
+is **"Za danas više nema projekcija."** — not "sve projekcije su već počele",
+which the grace period made false, since the page now stays populated for an
+hour after the last film starts. The generic message is only used when the time
+filter is *not* the cause — if the reader's own audio/kids filters or search
+term emptied the page. Late in the evening today's page legitimately goes empty;
+that is the correct answer, not a bug.
 
 **R-7c.8 A page left open re-filters itself.** The cutoff is re-evaluated every
-minute and `apply()` runs only when it actually moves.
+minute and `apply()` runs only when it actually moves — which also un-marks a
+chip as it passes out of the grace window (R-7c.2a).
 
 **R-7c.9 No-JS shows the superset** (R-7.7). Unlike the city filter (R-7b.4),
 an unfiltered superset here is merely broader, not wrong, so nothing is

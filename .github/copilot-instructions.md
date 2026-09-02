@@ -34,10 +34,13 @@ build timestamp is the only exact freshness claim.
   `dubbed` chip, so `subtitled`, `original` (domaći) and `unknown` all stay
   visible; that is why it is not labelled "Titlovano" (R-7.1b). The
   unknown-language notice belongs to the dubbed state alone (R-7.8).
-- **Today's page hides screenings that have already started**, strictly and in
-  the browser (Belgrade time, today only). The chains disagree about how much of
-  the past they publish, so this consistency is our rule, not theirs — and late
-  in the evening today's page legitimately goes empty.
+- **Today's page keeps a screening for 60 minutes after it starts**, then hides
+  it — in the browser, Belgrade time, today only (`GRACE_MINUTES`, R-7c.2). You
+  can still walk into a film that began twenty minutes ago. Chips inside that
+  window are muted via `data-started` so the reader can tell (R-7c.2a); never
+  strike them through, they are working booking links. The chains disagree about
+  how much of the past they publish, so this consistency is our rule, not
+  theirs — and late in the evening today's page legitimately goes empty.
 - **`CinemaId` is a venue, not a chain.** Beograd has five Cineplexx venues;
   collapsing them would show Delta City and Galerija as one building. Chain-level
   facts such as metadata trust live on `Cinema.chain`.
