@@ -182,7 +182,7 @@ export const MANIFEST = {
   name: 'Kokice',
   short_name: 'Kokice',
   description:
-    'Kokice — objedinjen repertoar bioskopa u Novom Sadu i Beogradu, osvežen svakog sata.',
+    'Kokice — objedinjen repertoar bioskopa u Novom Sadu i Beogradu, osvežavan više puta dnevno.',
   lang: 'sr-Latn-RS',
   dir: 'ltr',
   start_url: './index.html',

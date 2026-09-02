@@ -8,11 +8,16 @@ in commit messages and PR descriptions when a change touches them.
 
 ## What this is
 
-A static site, rebuilt hourly by GitHub Actions and served by GitHub Pages, that
+A static site, rebuilt by GitHub Actions and served by GitHub Pages, that
 scrapes and merges showtimes from **ten cinema venues across Novi Sad and
 Beograd** (Arena, Cineplexx, CineStar, Tuck), enriches them via TMDb, and
 renders one Serbian-language HTML page per day. The app is named **Kokice**;
 the repository keeps its old name on purpose until the domain move (R-13.8).
+
+The cron asks for hourly but GitHub dispatches it **2-6 times a day** (measured:
+mean gap 4.3 h, zero cancelled runs, ~2 min each - it is GitHub's scheduler, not
+this repo). **No page copy may claim an hourly refresh** (R-2.6a); the footer's
+build timestamp is the only exact freshness claim.
 
 ## Non-negotiable constraints
 

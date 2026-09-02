@@ -579,7 +579,9 @@ export function renderDayPage(snapshot: Snapshot, date: string, swVersion = ''):
   const dayLabel = formatDayLabel(date, days[0]);
   const canonicalUrl = pageUrl(date, days);
   const pageTitle = `${SITE_TITLE} | ${dayLabel}`;
-  const description = `Repertoar bioskopa u Novom Sadu i Beogradu za ${dayLabel}: ${movieCount} filmova, ${showtimeCount} projekcija. Osvežava se svakog sata.`;
+  // Not "svakog sata": the cron asks for hourly but GitHub dispatches it 2-6
+  // times a day, so the footer's real build time is the only exact claim (R-2.6).
+  const description = `Repertoar bioskopa u Novom Sadu i Beogradu za ${dayLabel}: ${movieCount} filmova, ${showtimeCount} projekcija. Osvežava se više puta dnevno.`;
   const ogImage = `${BASE_URL}/assets/icon-512.png`;
 
   const jsonLd = buildStructuredData(snapshot, date);

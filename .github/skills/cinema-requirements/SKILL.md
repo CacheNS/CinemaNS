@@ -1,6 +1,6 @@
 ---
 name: cinema-requirements
-description: Baseline requirements and hard-won data-accuracy rules for Kokice, the Novi Sad + Beograd cinema aggregator. Use before changing anything in this repository — scrapers/adapters (Arena, Cineplexx, CineStar, Tuck), title matching, TMDb enrichment, age ratings, dubbing/subtitling labels, filters, the city switcher, the rendered HTML/CSS, the PWA install flow, or the hourly GitHub Actions build. Also use after making any such change, to update REQUIREMENTS.md, AGENTS.md, copilot-instructions.md and this file — without being asked.
+description: Baseline requirements and hard-won data-accuracy rules for Kokice, the Novi Sad + Beograd cinema aggregator. Use before changing anything in this repository — scrapers/adapters (Arena, Cineplexx, CineStar, Tuck), title matching, TMDb enrichment, age ratings, dubbing/subtitling labels, filters, the city switcher, the rendered HTML/CSS, the PWA install flow, or the scheduled GitHub Actions build. Also use after making any such change, to update REQUIREMENTS.md, AGENTS.md, copilot-instructions.md and this file — without being asked.
 ---
 
 # Kokice (Novi Sad + Beograd cinema aggregator) — requirements baseline
@@ -16,17 +16,22 @@ Requirements have stable ids (`R-10.3`). Cite them when a change touches them.
 
 **Always fetch the latest changes before making any change.** Run
 `git fetch --all` and check `git status`/`git branch -vv` for how the current
-branch relates to its remote before editing anything — this repo is built by
-an hourly Actions run that commits `data/raw.json` and `data/health.json`
+branch relates to its remote before editing anything — this repo is built by a
+scheduled Actions run that commits `data/raw.json` and `data/health.json`
 straight to `main` (§17.14), so `main` moves on its own even with no human
 pushes. Starting from a stale base risks a conflict-laden or silently
 overwritten commit later.
 
 ## Orientation
 
-Static site → built hourly by GitHub Actions → served by GitHub Pages. A
+Static site → built by scheduled GitHub Actions → served by GitHub Pages. A
 Node.js + TypeScript build scrapes ten venues across two cities in parallel,
 enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus `data.json`.
+
+The cron asks for hourly but GitHub delivers **2-6 runs a day** (mean gap 4.3 h,
+measured over 220 runs). The workflow is healthy — zero cancellations, ~2 min
+per run — so do not go hunting for a repo-side cause, and **never let page copy
+claim an hourly refresh** (R-2.6a).
 
 | Area | Where | Spec |
 |---|---|---|
@@ -228,10 +233,11 @@ change isn't finished yet.
 
 - `TMDB_API_KEY` is configured as a repository secret; age ratings, scores and
   cross-language matching are active (§14.1).
-- The site is deployed and live at <https://kokice.org>, built and pushed hourly
-  by Actions (§14.3). DNS is Cloudflare's and the records are **proxied**;
-  GoDaddy is only the registrar. There is deliberately **no `CNAME` file** —
-  artifact-based Pages keeps the custom domain in repository settings (§13.12).
+- The site is deployed and live at <https://kokice.org>, built and pushed by
+  scheduled Actions runs (§14.3). DNS is Cloudflare's and the records are
+  **proxied**; GoDaddy is only the registrar. There is deliberately **no
+  `CNAME` file** — artifact-based Pages keeps the custom domain in repository
+  settings (§13.12).
 - Cloudflare Web Analytics is enabled in **automatic** mode and injected at the
   edge; there is no token and no analytics code to find (§16.3).
 - **The repository is deliberately still named `CinemaNS` even though the app is

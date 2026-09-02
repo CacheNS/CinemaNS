@@ -69,12 +69,26 @@ trivially satisfied; do not add infrastructure for it.)
 **R-2.5 No server process.** There must be nothing to keep alive, restart or
 monitor. The worst failure mode is a *stale* site, never a *down* site.
 
-**R-2.6 Honest freshness.** The footer shows the actual build time, so "hourly"
+**R-2.6 Honest freshness.** The footer shows the actual build time, so freshness
 is stated as fact rather than implied. GitHub's cron can be delayed; the site
 must not pretend otherwise.
 
-**R-2.7 Politeness.** One refresh per hour, sequential per host, small delay,
-descriptive User-Agent. Arena requires N+1 requests (one page per film).
+**R-2.6a No page copy may claim an hourly refresh.** The cron asks for hourly
+(R-13.1) and the workflow is healthy, but GitHub does not dispatch it hourly.
+Measured 2026-09-02 over 220 runs of `CacheNS/CinemaNS`: **mean gap 4.30 h,
+median 4.13 h, max 10.83 h**; scheduled runs fired 22–23 of 24 per day until
+2026-08-25, then **2–6 per day** from 08-27 on. Exactly one run in 220 fired at
+the requested `:07` — dispatch clusters at `:30`–`:58`, i.e. GitHub delays the
+event past the next tick and then drops that tick. Nothing in this repository
+causes it: 218 of 220 runs succeeded, **zero** were cancelled, and each run
+completes in ~2 minutes, so neither the `concurrency: pages` group nor a slow
+`deploy-pages` is responsible. The meta description (`html.ts`) and the manifest
+description (`icon.ts`) therefore say **"osvežava se više puta dnevno"**, never
+"svakog sata". The footer's build timestamp remains the only exact claim.
+
+**R-2.7 Politeness.** At most one refresh per hour, sequential per host, small
+delay, descriptive User-Agent. Arena requires N+1 requests (one page per film).
+This is a ceiling, not a promise — see R-2.6a for what actually happens.
 
 **R-2.7a CineStar needs a browser TLS fingerprint, not just browser headers.**
 `cinestarcinemas.rs` sits behind a Cloudflare **managed challenge** that
@@ -118,8 +132,8 @@ the resource, so it gets the same backoff retry as 429 and 5xx.
 
 ## 3. Architecture (fixed decisions)
 
-**R-3.1** Static site, built hourly by **GitHub Actions**, served by **GitHub
-Pages**. No runtime, no database.
+**R-3.1** Static site, rebuilt on a schedule by **GitHub Actions** (R-2.6a),
+served by **GitHub Pages**. No runtime, no database.
 
 **R-3.2** Node.js + TypeScript build. No frontend framework. Hand-written CSS.
 Client-side JS is limited to filters, install UX and service-worker
@@ -726,7 +740,10 @@ entry (R-7b.8), and the rendered page has the non-default city pre-hidden
 ## 13. Deployment
 
 **R-13.1** `.github/workflows/build.yml` runs on `schedule: cron '7 * * * *'`,
-on push, and on `workflow_dispatch`.
+on push, and on `workflow_dispatch`. GitHub honours that schedule only 2–6
+times a day in practice, which is why no page copy claims hourly (R-2.6a).
+Do not "fix" it by shortening the cron: R-2.7 caps refreshes at one per hour
+and GitHub would drop the extra ticks anyway.
 
 **R-13.2** Steps: checkout → setup-node → `npm ci` → `npm test` →
 `npm run build` → upload artifact → `actions/deploy-pages`.

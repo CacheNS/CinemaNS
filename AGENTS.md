@@ -10,11 +10,18 @@ For the condensed version, see
 
 ## What this is
 
-A static site, rebuilt hourly by GitHub Actions and served by GitHub Pages, that
+A static site, rebuilt by GitHub Actions and served by GitHub Pages, that
 scrapes and merges movie showtimes from **ten cinema venues across Novi Sad and
 Beograd**, enriches them via TMDb, and renders one Serbian-language page per day
 plus a reusable `data.json`. The app is called **Kokice**; the repository keeps
 its old name deliberately (R-13.8).
+
+The cron asks for hourly, but GitHub dispatches it **2-6 times a day** (measured
+2026-09-02 across 220 runs: mean gap 4.3 h, and only one run fired at the
+requested `:07`). The workflow itself is healthy - zero cancelled runs, ~2 min
+each - so this is GitHub's scheduler, not the repository. **No page copy may
+claim an hourly refresh** (R-2.6a); the footer's build timestamp is the only
+exact freshness claim.
 
 ## Commands
 
