@@ -446,8 +446,6 @@ main {
 .showtime:hover { border-color: var(--accent); }
 .showtime__time { font-size: 0.92rem; font-weight: 600; }
 .showtime__meta { font-size: 0.65rem; color: var(--muted); }
-.showtime--dubbed { border-color: rgba(110, 231, 168, 0.35); }
-.showtime--original { border-color: rgba(196, 181, 253, 0.35); }
 
 /* Already started, still inside the grace window - muted, but not struck
    through: the chip is a working booking link and often still sells. */

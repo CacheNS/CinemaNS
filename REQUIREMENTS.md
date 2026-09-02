@@ -485,6 +485,18 @@ films, which have no foreign original title.
 **R-8.3 Audio next to format.** Every format badge and chip states dubbed /
 subtitled / domestic — e.g. `4DX 3D · titlovano`, `2D · domaći film`.
 
+**R-8.3a A showtime chip is never coloured by audio.** Chips once carried a
+`showtime--<audio>` class that tinted the border green for `dubbed` and violet
+for `original`, leaving `subtitled` and `unknown` on the default grey. It read
+as a status signal rather than a language one — a mostly-grey row with a few
+green pills looks like some screenings are special, not like some are
+synchronised — and the two tints were nowhere explained on the page. Audio is
+already stated in words on every chip (R-8.3) and is filterable (R-7.1a), so
+the colour added no information. The only border treatment left on a chip is
+the grace-window muting of R-7c.2a, which now reads unambiguously because it is
+the sole variation. Do not reintroduce per-audio colours; `data-audio` stays,
+since the filter reads it (R-8.9).
+
 **R-8.4 Runtime traffic light**, as its own badge:
 
 | Runtime | Colour |

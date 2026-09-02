@@ -91,6 +91,11 @@ claim an hourly refresh** (R-2.6a).
     nested inside a wrapping `<a>` — `.badges` is a flex row with default
     `align-items: stretch`, so only a direct flex child gets stretched to match
     its siblings' height; a nested one renders visibly shorter (§15.4a).
+    **Showtime chips carry no audio colour** (§8.3a): the old green `dubbed` /
+    violet `original` borders read as a status flag, were never explained on
+    the page, and duplicated text the chip already shows. Leave the
+    grace-window muting (§7c.2a) as a chip's only border variation, and keep
+    `data-audio`, which the filter reads.
 13. **CineStar needs `tlsFallback`.** It sits behind a Cloudflare TLS-fingerprint
     challenge and 403s from CI; headers and even headless Chromium do not clear
     it (§2.7a). It can pass locally and fail in CI — read the Actions log.

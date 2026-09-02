@@ -237,6 +237,8 @@ test('renders data-audio for original and unknown, which the subtitled mode keep
   const today = renderDayPage(mixed, '2026-08-19');
   assert.ok(today.includes('data-audio="original"'));
   assert.ok(today.includes('data-audio="unknown"'));
+  // Audio drives the filter, never the chip's colour (R-8.3a).
+  assert.ok(!/class="showtime showtime--/.test(today));
 });
 
 test('emits a search box and a folded data-search haystack before the listing', () => {
@@ -265,7 +267,7 @@ test('emits what the past-showtime filter needs to work', () => {
   assert.ok(today.includes('data-date="2026-08-19"'));
   // Every chip must carry its start time; one without would silently survive
   // the cutoff.
-  const chips = today.match(/class="showtime /g) ?? [];
+  const chips = today.match(/class="showtime"/g) ?? [];
   const times = today.match(/data-time="\d{2}:\d{2}"/g) ?? [];
   assert.ok(chips.length > 0);
   assert.equal(times.length, chips.length);
