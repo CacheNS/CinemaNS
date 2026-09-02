@@ -133,6 +133,12 @@ These look like trivia, but each one was a real bug. See §10 of
   was broken on the live page.
 - CSS badge modifier rules must stay *after* the base `.badge` rule, or its
   `color` wins.
+- **Never colour a showtime chip by audio** (R-8.3a). The old
+  `showtime--dubbed` (green) / `showtime--original` (violet) borders looked
+  like a status flag rather than a language cue and were unexplained on the
+  page. Audio is already spelled out on every chip and is filterable, so the
+  tint carried no information. The grace-window muting (R-7c.2a) is now a
+  chip's only border variation. Keep `data-audio` — the filter needs it.
 - A badge's classes belong on the single outermost element, never on a `<span>`
   nested inside a wrapping `<a>`. `.badges` is a flex row with the default
   `align-items: stretch`, so only a direct flex child stretches to match its

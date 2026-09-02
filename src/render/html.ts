@@ -264,7 +264,7 @@ function renderShowtime(showtime: Showtime): string {
   const href = safeUrl(showtime.bookingUrl) ?? safeUrl(cinema.url) ?? '#';
 
   return `
-        <a class="showtime showtime--${showtime.audio}"
+        <a class="showtime"
            href="${href}"
            rel="noopener nofollow"
            target="_blank"

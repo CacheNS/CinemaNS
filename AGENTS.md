@@ -144,6 +144,12 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   reproduce the *real* markup — a simplified fixture once passed while the
   parser was broken against the live page.
 - CSS badge modifier rules must stay after the base `.badge` rule.
+- **Showtime chips are never coloured by audio** (R-8.3a). The removed
+  `showtime--dubbed` / `showtime--original` border tints read as a status
+  signal, not a language one, and nothing on the page explained them; the
+  audio is already written on the chip (R-8.3) and filterable (R-7.1a). The
+  grace-window muting of R-7c.2a is now the only border variation a chip has,
+  which is what makes it legible. `data-audio` stays — the filter reads it.
 - A badge's classes go on the single outermost element, never on a `<span>`
   nested inside a wrapping `<a>`. `.badges` is a flex row with the default
   `align-items: stretch`, so only a direct flex child gets stretched to match
