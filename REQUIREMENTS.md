@@ -1264,3 +1264,126 @@ since the title is already known server-side.
 indexable; they do not add the separate city-specific entry pages that
 R-7b.9 already flags as the follow-up if search traffic ever outweighs
 switch latency.
+
+---
+
+## 19. Multilingual
+
+**R-19.1 Serbian is the default and stays at the site root; English is a
+parallel `/en/` tree.** `renderPages` emits every day page twice, keyed by
+`<pathPrefix><pageName>`, so `dist/` holds `index.html` + seven dated pages at
+the root and the same eight again under `en/`. Both are real static documents:
+language is a property of the *page*, not a client-side toggle, so a crawler
+and a no-JS reader each get one coherent language rather than a mixture.
+
+**R-19.1a This is deliberately not the city pattern.** The city switch renders
+both cities into one page and reveals one (R-7b.4) because switching must be
+instant. Doing that for language would roughly double every page's bytes to
+serve text nine readers in ten will never look at, and would leave one URL
+claiming two languages — which is exactly what `hreflang` exists to avoid.
+
+**R-19.2 Every user-facing string lives in `src/core/i18n.ts`.** `Strings` is a
+typed interface, not a `Record<string, string>`, so a key added for Serbian and
+forgotten for English fails `tsc --noEmit` rather than silently rendering
+Serbian to an English reader. A runtime test (`i18n.test.ts`) additionally
+asserts that the strings which *must* differ actually do — the type system
+cannot catch a key that was copied rather than translated.
+
+**R-19.3 `app.js` carries no display copy.** It is a single static asset shared
+by both trees (R-19.4), so it cannot be compiled per language. The live count's
+plural forms are rendered into `#counts` as `data-plural-*` attributes in the
+form `"{n} film|{n} filma|{n} filmova"` — three slots for Serbian, two for
+English, selected by `data-plural-rule`. The started-screening label arrives
+the same way, on `#movies` (R-7c.2a). Do **not** reintroduce a literal string
+into `app.js`; and do not solve this with an inline `<script>` holding a JSON
+blob, which R-17.9's CSP forbids.
+
+**R-19.4 `style.css`, `app.js`, the icons, `sw.js` and `data.json` are
+single-copy at the site root.** Only the day pages and `manifest.webmanifest`
+are duplicated per language. A page in `/en/` therefore reaches them through
+`LOCALES[lang].assetPrefix` (`../`), which is threaded through the head, the
+script tag, the icon links and the manifest's own icon paths. **The sharpest
+edge here is the service worker**: registering a bare `sw.js` from `/en/` asks
+for `/en/sw.js` and 404s, so the path is rendered into the page as
+`<meta name="sw-path">` and read from there (R-9.7b still applies — the `?v=`
+tag rides on top of it). Registered from `../sw.js`, the worker's scope is
+still `/`, covering both trees; `sw.js` precaches `./en/` and `./en/index.html`
+alongside the Serbian shell.
+
+**R-19.5 TMDb is fetched twice per film: `sr-RS`, then `en-US`.** `language`
+applies to the whole TMDb response and there is no way to ask for two
+localisations at once, so the English title, genres and overview come from a
+second, smaller request. It is `.catch`-ed to `null`: **TMDb remains enrichment,
+never a hard dependency** (R-5.3). With no API key — which is how the build
+currently runs — the English pages show the same scraped titles the Serbian
+pages do, and nothing fails.
+
+**R-19.5a English text must never pass through `toSerbianLatin()`.** That
+function is a Cyrillic-to-Latin mapping for Serbian (R-8.12); English has
+nothing for it to convert, and routing English through it would only invite
+someone to "simplify" the two paths into one. `escapeHtml` still applies to
+both, which is safe because the conversion is a no-op on Latin input. The age
+heuristic keeps matching the **Serbian** genre list either way (R-10.12), since
+`ADULT_GENRES` is Serbian Latin.
+
+**R-19.5b Genres are translated from a table, not left to TMDb.** Genres are
+usually *not* TMDb's: `movie.genres` falls back to what the cinemas publish,
+and with no API key — how the build currently runs — that is the only source,
+so `genresEn` is absent on every film and the English page would print
+"Akcija, Triler". `translateGenre()` in `i18n.ts` maps the published Serbian
+vocabulary to English and **falls back to the original for anything unknown**;
+an untranslated label is a smaller failure than a missing one. A test pins the
+vocabulary a real build produced, so a new genre appearing upstream shows up as
+a test failure rather than as Serbian text on an English page.
+
+**R-19.5c Genres are deduplicated after translation, not before.** The cinemas
+spell one genre three ways — "Akcija", "Akcijski", "Akcioni" — which all
+collapse to "Action", so translating first and then de-duplicating is what
+stops a card reading "Action, Adventure, Action". (The Serbian page still shows
+the three spellings; canonicalising them there would change Serbian copy and is
+a separate decision.)
+
+**R-19.6 The language preference is remembered but never guessed.**
+`localStorage['kokice.lang']` is written only when the reader clicks the
+switcher. On a later visit to the Serbian root, an explicitly stored `en`
+redirects once per tab (guarded by `sessionStorage`) and carries the query
+string across. `navigator.language` is **not** consulted: a stored preference
+is something the reader asked for, a guessed one is something that happens to
+them. Crawlers have no `localStorage`, so `/` always indexes as Serbian.
+
+**R-19.6a Accepted trade-off:** `app.js` is `defer`red, so a returning English
+reader sees a brief flash of the Serbian page before the redirect. Fixing it
+would need an inline script, which R-17.9 forbids. The flash is the cheaper
+cost.
+
+**R-19.7 The switcher is a real navigation, unlike the city tabs.** Serbian and
+English are different documents, so JS never calls `preventDefault()` on it —
+it only records the choice. The current language renders as a `<span>`, not a
+self-link, so the site never emits a link to `index.html` competing with its
+own canonical `/` (R-18.1). Its `href` is rewritten by `syncUrl()` along with
+the day tabs, so `?grad`, `?audio`, `?kids` and `?q` all survive the switch —
+without that it silently resets the reader's city, filters and search.
+
+**R-19.7a It sits in the header's top-right corner**, level with the `<h1>`, in
+a `.header__top` flex row. It is visually quieter than the city tabs
+(smaller, outline only) because language is a once-ever choice while city is a
+routine one. The `<h1>` takes the free space and wraps on a phone; `.langs` has
+`flex-shrink: 0` so the tabs keep their width and stay pinned to the corner at
+360 px.
+
+**R-19.8 Both trees cross-link with `hreflang`, and `x-default` names the
+Serbian page.** Every page carries `alternate` links for both languages plus
+`x-default`, and `sitemap.xml` repeats the pairing with `xhtml:link` entries on
+one `<url>` per day *per language*. Without this the two trees read as
+duplicate content rather than translations.
+
+**R-19.9 Dates are localised, but only for display.** `formatDayLabel`,
+`formatDayShort` and `formatTimestamp` take a `lang`. `localDate()` and
+`localTime()` keep using `en-CA`/`en-GB` purely for their ISO-shaped output and
+must not be touched. The exported `MONTHS` array stays **Serbian in both trees**
+— it is the Tuck adapter's parsing table, not a display list (R-10.x), and
+translating it would break that scraper.
+
+**R-19.10 Adding a third language is a data change, not a code change.** Add the
+`Lang` member, a `LOCALES` entry and a `STRINGS` block; `renderPages`,
+`renderSitemap`, the manifest loop and the alternates all iterate `LANGS`.

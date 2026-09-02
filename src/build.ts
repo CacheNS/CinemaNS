@@ -9,12 +9,13 @@ import { scrapeCineplexx } from './adapters/cineplexx.js';
 import { scrapeCinestar } from './adapters/cinestar.js';
 import { scrapeTuck } from './adapters/tuck.js';
 import { windowDays } from './core/dates.js';
+import { LANGS, LOCALES } from './core/i18n.js';
 import { mergeMovies } from './core/merge.js';
 import { CINEMAS, CINEMA_IDS, CITIES } from './core/types.js';
 import type { CinemaId, Movie, RawMovie, Snapshot, SourceStatus } from './core/types.js';
 import { TmdbClient } from './tmdb/client.js';
 import { renderPages, renderRobots, renderSitemap } from './render/html.js';
-import { MANIFEST, renderIcon } from './render/icon.js';
+import { manifestFor, renderIcon } from './render/icon.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** `lib/` at runtime, so the repo root is one level up. */
@@ -246,8 +247,12 @@ async function writeSite(snapshot: Snapshot): Promise<void> {
   ]);
   const swVersion = computeAssetVersion(styleCss + appJs);
 
+  // Keys carry the language prefix ('en/index.html'), so each page's directory
+  // has to exist before it is written.
   for (const [name, html] of renderPages(snapshot, swVersion)) {
-    await writeFile(path.join(DIST_DIR, name), html, 'utf8');
+    const target = path.join(DIST_DIR, name);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, html, 'utf8');
   }
   await writeFile(
     path.join(DIST_DIR, 'data.json'),
@@ -263,12 +268,16 @@ async function writeSite(snapshot: Snapshot): Promise<void> {
   }
 
   // Installable web app: the service worker must sit at the site root so its
-  // scope covers every day page.
-  await writeFile(
-    path.join(DIST_DIR, 'manifest.webmanifest'),
-    JSON.stringify(MANIFEST, null, 2),
-    'utf8',
-  );
+  // scope covers every day page in both language trees. The manifest is the
+  // one per-language file — each tree links to its own, so an English reader
+  // installing the app gets an English description and `lang`.
+  for (const lang of LANGS) {
+    await writeFile(
+      path.join(DIST_DIR, LOCALES[lang].pathPrefix, 'manifest.webmanifest'),
+      JSON.stringify(manifestFor(lang), null, 2),
+      'utf8',
+    );
+  }
   await writeFile(
     path.join(DIST_DIR, 'sw.js'),
     renderServiceWorker(swTemplate, styleCss + appJs),

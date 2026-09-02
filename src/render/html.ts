@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 
 import { formatDayLabel, formatDayShort, formatTimestamp } from '../core/dates.js';
+import { DEFAULT_LANG, LANGS, LOCALES, STRINGS, otherLang, translateGenre } from '../core/i18n.js';
+import type { Lang, Strings } from '../core/i18n.js';
 import { trailerLink } from '../core/trailer.js';
 import { toSerbianLatin, transliterate } from '../core/titles.js';
 import { CINEMAS, CITIES, DEFAULT_CITY, cityById } from '../core/types.js';
@@ -13,9 +15,6 @@ import type { Movie, Showtime, Snapshot } from '../core/types.js';
  * is a one-line edit rather than a search-and-replace.
  */
 export const BASE_URL = 'https://kokice.org';
-
-/** The keyword-bearing base title, shared by every page and reused in `<h1>`. */
-const SITE_TITLE = 'Kokice.org — Repertoar bioskopa za Novi Sad i Beograd';
 
 /**
  * Escapes for HTML, and converts any Serbian Cyrillic to Latin on the way out.
@@ -88,10 +87,14 @@ function pageName(date: string, days: string[]): string {
  * Absolute, canonical URL for a day page. `index.html` collapses to the bare
  * origin — the two must never both be indexable, or Search Console reports
  * them as duplicate content competing against each other.
+ *
+ * The language prefix lives here rather than at the call sites, so `/en/` and
+ * `/en/index.html` collapse the same way `/` and `/index.html` do.
  */
-function pageUrl(date: string, days: string[]): string {
+function pageUrl(date: string, days: string[], lang: Lang = DEFAULT_LANG): string {
+  const prefix = LOCALES[lang].pathPrefix;
   const name = pageName(date, days);
-  return name === 'index.html' ? `${BASE_URL}/` : `${BASE_URL}/${name}`;
+  return name === 'index.html' ? `${BASE_URL}/${prefix}` : `${BASE_URL}/${prefix}${name}`;
 }
 
 /**
@@ -226,36 +229,36 @@ export function safeUrl(value: string): string | undefined {
   return trimmed === undefined ? undefined : escapeHtml(trimmed);
 }
 
-function audioLabel(audio: Showtime['audio']): string {
+function audioLabel(audio: Showtime['audio'], t: Strings): string {
   switch (audio) {
     case 'dubbed':
-      return 'sinhronizovano';
+      return t.audioLabelDubbed;
     case 'subtitled':
-      return 'titlovano';
+      return t.audioLabelSubtitled;
     case 'original':
-      return 'domaći film';
+      return t.audioLabelOriginal;
     default:
-      return 'nije naznačeno';
+      return t.audioLabelUnknown;
   }
 }
 
 /** Short form used on the compact showtime chips. */
-function audioShort(audio: Showtime['audio']): string {
+function audioShort(audio: Showtime['audio'], t: Strings): string {
   switch (audio) {
     case 'dubbed':
-      return 'sinh.';
+      return t.audioShortDubbed;
     case 'subtitled':
-      return 'titl.';
+      return t.audioShortSubtitled;
     case 'original':
-      return 'dom.';
+      return t.audioShortOriginal;
     default:
-      return '?';
+      return t.audioShortUnknown;
   }
 }
 
-function renderShowtime(showtime: Showtime): string {
+function renderShowtime(showtime: Showtime, t: Strings): string {
   const cinema = CINEMAS[showtime.cinemaId];
-  const details = [showtime.format, audioLabel(showtime.audio)];
+  const details = [showtime.format, audioLabel(showtime.audio, t)];
   if (showtime.hall) details.push(showtime.hall);
 
   // A booking URL that is not a plain web link is not shown as one; the venue's
@@ -273,7 +276,7 @@ function renderShowtime(showtime: Showtime): string {
            title="${escapeHtml(`${cinema.name} · ${details.join(' · ')}`)}">
           <span class="showtime__time">${escapeHtml(showtime.time)}</span>
           <span class="showtime__meta">${escapeHtml(
-            `${showtime.format} · ${audioShort(showtime.audio)}`,
+            `${showtime.format} · ${audioShort(showtime.audio, t)}`,
           )}</span>
         </a>`;
 }
@@ -281,6 +284,7 @@ function renderShowtime(showtime: Showtime): string {
 function renderCinemaBlock(
   cinemaId: Movie['showtimes'][number]['cinemaId'],
   showtimes: Showtime[],
+  t: Strings,
 ): string {
   const cinema = CINEMAS[cinemaId];
   // Pre-hidden for every city but the default. Without JS the page would
@@ -293,24 +297,24 @@ function renderCinemaBlock(
         <a class="cinema__name" href="${safeUrl(cinema.url) ?? '#'}" rel="noopener" target="_blank">${escapeHtml(
           cinema.shortName,
         )}</a>
-        <div class="showtimes">${showtimes.map(renderShowtime).join('')}
+        <div class="showtimes">${showtimes.map((showtime) => renderShowtime(showtime, t)).join('')}
         </div>
       </div>`;
 }
 
-function renderAgeBadge(movie: Movie): string {
+function renderAgeBadge(movie: Movie, t: Strings): string {
   const rating = movie.ageRating;
   if (!rating) {
-    return `<span class="badge badge--age badge--unknown" title="Nijedan izvor ne objavljuje uzrasnu oznaku za ovaj film">Uzrast nepoznat</span>`;
+    return `<span class="badge badge--age badge--unknown" title="${escapeHtml(
+      t.ageUnknownTitle,
+    )}">${escapeHtml(t.ageUnknown)}</span>`;
   }
   const modifier = rating.minAge <= 12 ? 'kid' : rating.minAge >= 16 ? 'adult' : 'teen';
-  const suffix = rating.confident ? '' : ' (procena)';
-  const explanation = rating.confident
-    ? `Zvanična oznaka (${rating.source})`
-    : 'Procena na osnovu žanra — nije zvanična oznaka';
+  const suffix = rating.confident ? '' : t.ageEstimateSuffix;
+  const explanation = rating.confident ? t.ageOfficial(rating.source) : t.ageEstimate;
   return `<span class="badge badge--age badge--${modifier}${
     rating.confident ? '' : ' badge--estimate'
-  }" title="${escapeHtml(explanation)}">${escapeHtml(rating.label)}${suffix}</span>`;
+  }" title="${escapeHtml(explanation)}">${escapeHtml(rating.label)}${escapeHtml(suffix)}</span>`;
 }
 
 /** Same traffic-light idea as runtime: 7.5+ green, 5.0–7.5 amber, below 5.0 red. */
@@ -319,12 +323,12 @@ export function scoreBucket(value: number): 'good' | 'mixed' | 'bad' {
   return value >= 5.0 ? 'mixed' : 'bad';
 }
 
-function renderScoreBadge(movie: Movie): string {
+function renderScoreBadge(movie: Movie, t: Strings): string {
   const score = movie.score;
   if (!score) return '';
   const value = score.value.toFixed(1).replace('.', ',');
   const bucket = scoreBucket(score.value);
-  const title = `Ocena publike na ${score.source} — ${score.votes} glasova`;
+  const title = t.scoreTitle(score.source, score.votes);
   const scoreHref = score.url ? safeUrl(score.url) : undefined;
   // A wrapping <a> would be the flex item instead of the badge itself, leaving
   // the visible pill unstretched and a shade shorter than its siblings — so
@@ -348,29 +352,44 @@ export function runtimeBucket(minutes: number): 'short' | 'medium' | 'long' {
   return minutes < 120 ? 'medium' : 'long';
 }
 
-function formatRuntime(minutes: number): string {
+function formatRuntime(minutes: number, t: Strings): string {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return hours > 0 ? `${hours} h ${rest} min` : `${minutes} min`;
+  return hours > 0 ? t.runtimeHours(hours, rest) : t.runtimeMinutes(minutes);
 }
 
-function renderRuntimeBadge(movie: Movie): string {
+function renderRuntimeBadge(movie: Movie, t: Strings): string {
   const minutes = movie.runtimeMinutes;
   if (!minutes) return '';
   const bucket = runtimeBucket(minutes);
   const explanation = {
-    short: 'Kratak film — kraći od 90 minuta',
-    medium: 'Srednje dužine — između 90 minuta i 2 sata',
-    long: 'Dug film — 2 sata ili duže',
+    short: t.runtimeShort,
+    medium: t.runtimeMedium,
+    long: t.runtimeLong,
   }[bucket];
   return `<span class="badge badge--runtime badge--runtime-${bucket}" title="${escapeHtml(
     explanation,
-  )}">${escapeHtml(formatRuntime(minutes))}</span>`;
+  )}">${escapeHtml(formatRuntime(minutes, t))}</span>`;
 }
 
-function renderMovie(movie: Movie, date: string): string {
+function renderMovie(movie: Movie, date: string, t: Strings, lang: Lang): string {
   const showtimes = movie.showtimes.filter((showtime) => showtime.date === date);
   if (showtimes.length === 0) return '';
+
+  // TMDb's English localisation when there is one, otherwise the same text the
+  // Serbian page shows — the build must still work with no API key at all.
+  const title = (lang === 'en' && movie.titleEn) || movie.title;
+  // Genres usually come from the cinemas rather than TMDb, so without the
+  // English list they still need translating (R-19.5b). Deduped after
+  // translating, not before: the cinemas spell one genre three ways
+  // ("Akcija"/"Akcijski"/"Akcioni"), which collapse to a single "Action".
+  const genres = [
+    ...new Set(
+      ((lang === 'en' && movie.genresEn) || movie.genres).map((genre) =>
+        translateGenre(genre, lang),
+      ),
+    ),
+  ];
 
   // Grouped city by city so a card's blocks read Novi Sad first, then Beograd,
   // rather than interleaving venues from both.
@@ -402,29 +421,31 @@ function renderMovie(movie: Movie, date: string): string {
 
   // Folded to lowercase Latin ASCII with diacritics stripped, so the client
   // can match a plain-typed query against Serbian and English titles alike
-  // without re-implementing transliteration — see core/titles.ts.
-  const searchText = [movie.title, movie.originalTitle]
-    .filter((title): title is string => Boolean(title))
-    .map((title) => transliterate(title).toLowerCase())
+  // without re-implementing transliteration — see core/titles.ts. Both display
+  // titles are indexed on either tree, so searching "Vajana" still finds the
+  // film on the English page.
+  const searchText = [...new Set([movie.title, movie.titleEn, movie.originalTitle])]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => transliterate(value).toLowerCase())
     .join(' ');
 
   const trailer = trailerLink(movie);
   const posterSrc = movie.posterUrl ? safeUrl(movie.posterUrl) : undefined;
   const posterImage = posterSrc
-    ? `<img class="poster" src="${posterSrc}" alt="${escapeHtml(`${movie.title} — plakat`)}" loading="lazy" referrerpolicy="no-referrer">`
+    ? `<img class="poster" src="${posterSrc}" alt="${escapeHtml(t.posterAlt(title))}" loading="lazy" referrerpolicy="no-referrer">`
     : `<div class="poster poster--empty" aria-hidden="true"></div>`;
   const trailerHref = safeUrl(trailer.url);
   // Wrapped rather than replaced, so a film with no poster is still clickable.
   const poster = trailerHref
     ? `<a class="poster-link" href="${trailerHref}"
        target="_blank" rel="noopener noreferrer"
-       title="${trailer.exact ? 'Pogledaj trailer' : 'Potraži trailer na YouTube-u'}"
-       aria-label="${escapeHtml(`Trailer za ${movie.title}`)}"
+       title="${escapeHtml(trailer.exact ? t.trailerExact : t.trailerSearch)}"
+       aria-label="${escapeHtml(t.trailerAria(title))}"
     >${posterImage}<span class="poster-play" aria-hidden="true"></span></a>`
     : `<div class="poster-link">${posterImage}</div>`;
 
   const meta: string[] = [];
-  if (movie.genres.length) meta.push(movie.genres.slice(0, 3).join(', '));
+  if (genres.length) meta.push(genres.slice(0, 3).join(', '));
 
   return `
     <article class="movie"
@@ -436,34 +457,34 @@ function renderMovie(movie: Movie, date: string): string {
              data-search="${escapeHtml(searchText)}"${hidden}>
       <div class="movie__poster">${poster}</div>
       <div class="movie__body">
-        <h2 class="movie__title">${escapeHtml(movie.title)}${
-          movie.originalTitle
+        <h2 class="movie__title">${escapeHtml(title)}${
+          movie.originalTitle && movie.originalTitle !== title
             ? ` <span class="movie__original">(${escapeHtml(movie.originalTitle)})</span>`
             : ''
         }</h2>
         <div class="badges">
-          ${renderAgeBadge(movie)}
-          ${renderRuntimeBadge(movie)}
-          ${renderScoreBadge(movie)}
+          ${renderAgeBadge(movie, t)}
+          ${renderRuntimeBadge(movie, t)}
+          ${renderScoreBadge(movie, t)}
           ${variants
             .map(
               (variant) =>
                 `<span class="badge badge--variant badge--${variant.audio}">${escapeHtml(
                   variant.format,
-                )} · ${escapeHtml(audioLabel(variant.audio))}</span>`,
+                )} · ${escapeHtml(audioLabel(variant.audio, t))}</span>`,
             )
             .join('\n          ')}
         </div>
         ${meta.length ? `<p class="movie__meta">${escapeHtml(meta.join(' · '))}</p>` : ''}
         <div class="cinemas">${byCinema
-          .map((entry) => renderCinemaBlock(entry.cinemaId, entry.showtimes))
+          .map((entry) => renderCinemaBlock(entry.cinemaId, entry.showtimes, t))
           .join('')}
         </div>
       </div>
     </article>`;
 }
 
-function renderDayNav(days: string[], active: string): string {
+function renderDayNav(days: string[], active: string, lang: Lang): string {
   return days
     .map((date) => {
       const current = date === active;
@@ -471,7 +492,7 @@ function renderDayNav(days: string[], active: string): string {
         date,
         days,
       )}"${current ? ' aria-current="page"' : ''}>${escapeHtml(
-        formatDayShort(date, days[0]),
+        formatDayShort(date, days[0], lang),
       )}</a>`;
     })
     .join('\n        ');
@@ -481,7 +502,7 @@ function renderDayNav(days: string[], active: string): string {
  * One notice block per city, so a reader is only warned about the cinemas they
  * are actually looking at. All are rendered; JS reveals the active one.
  */
-function renderSourceNotices(snapshot: Snapshot): string {
+function renderSourceNotices(snapshot: Snapshot, lang: Lang, t: Strings): string {
   return CITIES.map((city) => {
     const problems = city.cinemaIds
       .map((id) => ({ id, status: snapshot.sources[id] }))
@@ -491,10 +512,8 @@ function renderSourceNotices(snapshot: Snapshot): string {
     const items = problems
       .map((entry) => {
         const cinema = CINEMAS[entry.id];
-        const when = formatTimestamp(entry.status.fetchedAt);
-        const reason = entry.status.ok
-          ? `podaci su preuzeti iz ranijeg osvežavanja (${when})`
-          : `poslednje uspešno osvežavanje: ${when}`;
+        const when = formatTimestamp(entry.status.fetchedAt, lang);
+        const reason = entry.status.ok ? t.staleFromCache(when) : t.staleLastOk(when);
         return `<li><strong>${escapeHtml(cinema.name)}</strong> — ${escapeHtml(reason)}</li>`;
       })
       .join('\n          ');
@@ -502,7 +521,7 @@ function renderSourceNotices(snapshot: Snapshot): string {
     const hidden = city.id === DEFAULT_CITY ? '' : ' hidden';
     return `
       <div class="notice notice--stale" data-city="${city.id}"${hidden}>
-        <p>Podaci za neke bioskope možda nisu ažurni:</p>
+        <p>${escapeHtml(t.staleIntro)}</p>
         <ul>
           ${items}
         </ul>
@@ -515,7 +534,7 @@ function renderSourceNotices(snapshot: Snapshot): string {
  * intercepts them to switch without a round trip; the `noscript` note is there
  * because a static page genuinely cannot honour them on its own.
  */
-function renderCityNav(): string {
+function renderCityNav(t: Strings): string {
   const tabs = CITIES.map((city) => {
     const current = city.id === DEFAULT_CITY;
     return `<a class="citytab${current ? ' citytab--active' : ''}" href="?grad=${
@@ -526,12 +545,12 @@ function renderCityNav(): string {
   }).join('\n      ');
 
   return `
-    <nav class="cities" id="cities" aria-label="Izbor grada">
+    <nav class="cities" id="cities" aria-label="${escapeHtml(t.cityNavLabel)}">
       ${tabs}
     </nav>
-    <noscript><p class="subtitle">Za promenu grada potreban je JavaScript; prikazan je ${escapeHtml(
-      cityById(DEFAULT_CITY).name,
-    )}.</p></noscript>`;
+    <noscript><p class="subtitle">${escapeHtml(
+      t.cityNoScript(cityById(DEFAULT_CITY).name),
+    )}</p></noscript>`;
 }
 
 /** One venue list per city, since the cinemas differ between them. */
@@ -543,7 +562,58 @@ function renderCitySubtitles(): string {
   }).join('\n    ');
 }
 
-export function renderDayPage(snapshot: Snapshot, date: string, swVersion = ''): string {
+/**
+ * Where a page for `date` in this tree links to the same day in `to`.
+ *
+ * Relative rather than absolute so the local preview and the deployed site
+ * behave identically. The source language's `assetPrefix` is what climbs out
+ * of `/en/` first; the target's `pathPrefix` then descends into it.
+ */
+function langHref(date: string, days: string[], from: Lang, to: Lang): string {
+  const name = pageName(date, days);
+  const up = LOCALES[from].assetPrefix;
+  const down = LOCALES[to].pathPrefix;
+  return `${up}${down}${name === 'index.html' ? '' : name}` || './';
+}
+
+/**
+ * Serbian and English are separate documents, so unlike the city tabs these
+ * must really navigate — JS stores the choice but never intercepts the click.
+ * The current language is a `<span>`, not a self-link, so the site never emits
+ * a link to `index.html` competing with its own canonical `/`.
+ */
+function renderLangNav(date: string, days: string[], lang: Lang, t: Strings): string {
+  const tabs = LANGS.map((code) => {
+    const locale = LOCALES[code];
+    if (code === lang) {
+      return `<span class="langtab langtab--active" aria-current="page">${escapeHtml(
+        locale.label,
+      )}</span>`;
+    }
+    return `<a class="langtab" href="${escapeHtml(
+      langHref(date, days, lang, code),
+    )}" hreflang="${locale.hreflang}" data-lang="${code}" data-langlink>${escapeHtml(
+      locale.label,
+    )}</a>`;
+  }).join('\n      ');
+
+  return `
+    <nav class="langs" id="langs" aria-label="${escapeHtml(t.langNavLabel)}">
+      ${tabs}
+    </nav>`;
+}
+
+export function renderDayPage(
+  snapshot: Snapshot,
+  date: string,
+  swVersion = '',
+  lang: Lang = DEFAULT_LANG,
+): string {
+  const t = STRINGS[lang];
+  const locale = LOCALES[lang];
+  // Assets and the service worker are single-copy at the site root (R-19.4),
+  // so a page in the /en/ tree has to climb out of it to reach them.
+  const asset = locale.assetPrefix;
   const days = snapshot.days;
   const moviesForDay = snapshot.movies.filter((movie) =>
     movie.showtimes.some((showtime) => showtime.date === date),
@@ -562,34 +632,50 @@ export function renderDayPage(snapshot: Snapshot, date: string, swVersion = ''):
     ),
   ).length;
 
-  const cards = moviesForDay.map((movie) => renderMovie(movie, date)).join('');
+  const cards = moviesForDay.map((movie) => renderMovie(movie, date, t, lang)).join('');
 
   const emptyHidden = movieCount === 0 ? '' : ' hidden';
-  const emptyState = `<p class="empty" id="empty"${emptyHidden}>Za ovaj dan nema pronađenih projekcija.</p>`;
+  const emptyState = `<p class="empty" id="empty"${emptyHidden}>${escapeHtml(t.empty)}</p>`;
 
   // A second empty state, because "nothing found" and "the day is over" are
   // different facts and the second one has a useful next step. Only the client
   // knows which applies, since it depends on the current time.
   const tomorrow = days[days.indexOf(date) + 1];
   const tomorrowLink = tomorrow
-    ? ` <a href="${escapeHtml(tomorrow)}.html" data-daylink>Pogledajte sutrašnji repertoar.</a>`
+    ? ` <a href="${escapeHtml(tomorrow)}.html" data-daylink>${escapeHtml(t.tomorrowLink)}</a>`
     : '';
-  const pastState = `<p class="empty" id="empty-past" hidden>Za danas više nema projekcija.${tomorrowLink}</p>`;
+  const pastState = `<p class="empty" id="empty-past" hidden>${escapeHtml(
+    t.emptyPast,
+  )}${tomorrowLink}</p>`;
 
-  const dayLabel = formatDayLabel(date, days[0]);
-  const canonicalUrl = pageUrl(date, days);
-  const pageTitle = `${SITE_TITLE} | ${dayLabel}`;
+  const dayLabel = formatDayLabel(date, days[0], lang);
+  const canonicalUrl = pageUrl(date, days, lang);
+  const pageTitle = `${t.siteTitle} | ${dayLabel}`;
   // Not "svakog sata": the cron asks for hourly but GitHub dispatches it 2-6
   // times a day, so the footer's real build time is the only exact claim (R-2.6).
-  const description = `Repertoar bioskopa u Novom Sadu i Beogradu za ${dayLabel}: ${movieCount} filmova, ${showtimeCount} projekcija. Osvežava se više puta dnevno.`;
+  const description = t.metaDescription(dayLabel, movieCount, showtimeCount);
   const ogImage = `${BASE_URL}/assets/icon-512.png`;
+
+  // Each tree points at the other and at itself, plus an x-default naming the
+  // Serbian page as the one to serve a reader whose language we don't cover.
+  const alternates = [
+    ...LANGS.map(
+      (code) =>
+        `  <link rel="alternate" hreflang="${LOCALES[code].hreflang}" href="${pageUrl(
+          date,
+          days,
+          code,
+        )}">`,
+    ),
+    `  <link rel="alternate" hreflang="x-default" href="${pageUrl(date, days, DEFAULT_LANG)}">`,
+  ].join('\n');
 
   const jsonLd = buildStructuredData(snapshot, date);
   const jsonLdHash = createHash('sha256').update(jsonLd, 'utf8').digest('base64');
   const csp = buildCsp(jsonLdHash);
 
   return `<!DOCTYPE html>
-<html lang="sr-Latn">
+<html lang="${locale.htmlLang}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -599,7 +685,7 @@ export function renderDayPage(snapshot: Snapshot, date: string, swVersion = ''):
   <link rel="canonical" href="${canonicalUrl}">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Kokice">
-  <meta property="og:locale" content="sr_RS">
+  <meta property="og:locale" content="${locale.ogLocale}">
   <meta property="og:title" content="${escapeHtml(pageTitle)}">
   <meta property="og:description" content="${escapeHtml(description)}">
   <meta property="og:url" content="${canonicalUrl}">
@@ -608,13 +694,15 @@ export function renderDayPage(snapshot: Snapshot, date: string, swVersion = ''):
   <meta name="twitter:title" content="${escapeHtml(pageTitle)}">
   <meta name="twitter:description" content="${escapeHtml(description)}">
   <meta name="twitter:image" content="${ogImage}">
-  <link rel="stylesheet" href="assets/style.css">
+${alternates}
+  <link rel="stylesheet" href="${asset}assets/style.css">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0f1115">${
     swVersion ? `\n  <meta name="sw-version" content="${escapeHtml(swVersion)}">` : ''
   }
-  <link rel="icon" href="assets/icon-192.png" sizes="192x192" type="image/png">
-  <link rel="apple-touch-icon" href="assets/icon-180.png">
+  <meta name="sw-path" content="${asset}sw.js">
+  <link rel="icon" href="${asset}assets/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="${asset}assets/icon-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Kokice">
@@ -622,116 +710,147 @@ export function renderDayPage(snapshot: Snapshot, date: string, swVersion = ''):
 </head>
 <body>
   <header class="header">
-    <h1>${escapeHtml(SITE_TITLE)}</h1>
+    <div class="header__top">
+      <h1>${escapeHtml(t.siteTitle)}</h1>
+      ${renderLangNav(date, days, lang, t)}
+    </div>
     ${renderCitySubtitles()}
-    ${renderCityNav()}
+    ${renderCityNav(t)}
   </header>
 
-  <nav class="days" aria-label="Odabir dana">
-        ${renderDayNav(days, date)}
+  <nav class="days" aria-label="${escapeHtml(t.dayNavLabel)}">
+        ${renderDayNav(days, date, lang)}
   </nav>
 
   <main>
     <div class="toolbar">
-      <h2 class="toolbar__day">${escapeHtml(formatDayLabel(date, days[0]))}</h2>
+      <h2 class="toolbar__day">${escapeHtml(dayLabel)}</h2>
       <form class="filters" id="filters">
-        <div class="segmented" role="group" aria-label="Jezik projekcije">
+        <div class="segmented" role="group" aria-label="${escapeHtml(t.audioGroupLabel)}">
           <label class="segmented__option">
             <input type="radio" name="audio" id="audio-all" value="" checked>
-            <span>Svi</span>
+            <span>${escapeHtml(t.audioAll)}</span>
           </label>
           <label class="segmented__option">
             <input type="radio" name="audio" id="audio-dubbed" value="dubbed">
-            <span>Sinhro.</span>
+            <span>${escapeHtml(t.audioDubbedOption)}</span>
           </label>
           <label class="segmented__option"
-                 title="Titlovano, domaći filmovi i projekcije bez naznačenog jezika">
+                 title="${escapeHtml(t.audioSubtitledOptionTitle)}">
             <input type="radio" name="audio" id="audio-subtitled" value="subtitled">
-            <span>Bez sinhro.</span>
+            <span>${escapeHtml(t.audioSubtitledOption)}</span>
           </label>
         </div>
         <label class="filter">
           <input type="checkbox" id="filter-kids" name="kids" value="1">
-          <span>Za decu</span>
+          <span>${escapeHtml(t.kids)}</span>
         </label>
       </form>
     </div>
 
-    <p class="counts" id="counts" data-total-movies="${movieCount}" data-total-showtimes="${showtimeCount}">
-      ${movieCount} filmova · ${showtimeCount} projekcija
+    <p class="counts" id="counts" data-total-movies="${movieCount}" data-total-showtimes="${showtimeCount}"
+       data-plural-rule="${locale.pluralRule}"
+       data-plural-movies="${escapeHtml(t.pluralMovies)}"
+       data-plural-showtimes="${escapeHtml(t.pluralShowtimes)}"
+       data-plural-unknown="${escapeHtml(t.pluralUnknownAudio)}">
+      ${escapeHtml(t.counts(movieCount, showtimeCount))}
     </p>
 
-    ${renderSourceNotices(snapshot)}
+    ${renderSourceNotices(snapshot, lang, t)}
     ${emptyState}
     ${pastState}
 
     <div class="search">
       <input type="search" class="search__input" id="movie-search"
-             placeholder="Pretraga filmova…" aria-label="Pretraga filmova" autocomplete="off">
+             placeholder="${escapeHtml(t.searchLabel)}" aria-label="${escapeHtml(
+               t.searchLabel,
+             )}" autocomplete="off">
     </div>
 
-    <div class="movies" id="movies" data-date="${escapeHtml(date)}" data-started-label="već počelo">${cards}
+    <div class="movies" id="movies" data-date="${escapeHtml(date)}" data-started-label="${escapeHtml(
+      t.startedLabel,
+    )}">${cards}
     </div>
   </main>
 
   <footer class="footer">
     <div class="install" id="install">
       <button type="button" class="install__button" id="install-button">
-        📲 Instaliraj aplikaciju
+        ${escapeHtml(t.installButton)}
       </button>
       <div class="install__hint" id="install-hint" hidden>
-        <p><strong>Android (Chrome):</strong> meni ⋮ → „Instaliraj aplikaciju“
-           odnosno „Dodaj na početni ekran“.</p>
-        <p><strong>iPhone / iPad (Safari):</strong> dugme <strong>Podeli</strong>
-           ↑ → <strong>„Dodaj na početni ekran“</strong>. Safari nema automatsku
-           instalaciju, pa je ovo jedini način na iOS-u.</p>
-        <p><strong>Računar (Chrome / Edge):</strong> ikonica za instalaciju
-           u adresnoj traci.</p>
+        ${t.installHintHtml}
       </div>
     </div>
-    <p>Poslednje osvežavanje: ${escapeHtml(formatTimestamp(snapshot.generatedAt))}.</p>
-    <p>Podaci se preuzimaju sa sajtova bioskopa. Oznake uzrasta gledalaca i ocene su
-       informativne i preuzete iz TMDb baze — proverite zvaničnu oznaku na sajtu
-       bioskopa.</p>
-    <p>Postoji mogućnost da podaci nisu ispravni. Proverite pre odlaska u bioskop.</p>
-    <p class="footer__privacy">Broj poseta se meri anonimno (Cloudflare Web
-       Analytics). Ne koriste se kolačići i ne prikupljaju se lični podaci.</p>
+    <p>${escapeHtml(t.lastUpdate(formatTimestamp(snapshot.generatedAt, lang)))}</p>
+    <p>${escapeHtml(t.disclaimerSource)}</p>
+    <p>${escapeHtml(t.disclaimerAccuracy)}</p>
+    <p class="footer__privacy">${escapeHtml(t.privacy)}</p>
   </footer>
 
-  <a href="#top" class="scroll-top" aria-label="Nazad na vrh">↑</a>
+  <a href="#top" class="scroll-top" aria-label="${escapeHtml(t.scrollTop)}">↑</a>
 
-  <script src="assets/app.js" defer></script>
+  <script src="${asset}assets/app.js" defer></script>
 </body>
 </html>
 `;
 }
 
+/**
+ * Every page of every language, keyed by its path inside `dist/` — Serbian at
+ * the root, English under `en/` (R-19.1).
+ */
 export function renderPages(snapshot: Snapshot, swVersion = ''): Map<string, string> {
   const pages = new Map<string, string>();
-  for (const date of snapshot.days) {
-    pages.set(pageName(date, snapshot.days), renderDayPage(snapshot, date, swVersion));
+  for (const lang of LANGS) {
+    for (const date of snapshot.days) {
+      pages.set(
+        `${LOCALES[lang].pathPrefix}${pageName(date, snapshot.days)}`,
+        renderDayPage(snapshot, date, swVersion, lang),
+      );
+    }
   }
   return pages;
 }
 
 /**
- * One `<url>` per day page, pointing at the same canonical addresses the
- * pages declare for themselves. `lastmod` is the build time truncated to a
- * date, since the underlying data can only ever be at most an hour stale.
+ * One `<url>` per day page **per language**, pointing at the same canonical
+ * addresses the pages declare for themselves, each carrying `xhtml:link`
+ * alternates so a crawler sees the two trees as translations of one page
+ * rather than as duplicates. `lastmod` is the build time truncated to a date.
  */
 export function renderSitemap(snapshot: Snapshot): string {
   const lastmod = snapshot.generatedAt.slice(0, 10);
-  const urls = snapshot.days
-    .map(
+  const alternates = (date: string) =>
+    [
+      ...LANGS.map(
+        (code) =>
+          `    <xhtml:link rel="alternate" hreflang="${LOCALES[code].hreflang}" href="${pageUrl(
+            date,
+            snapshot.days,
+            code,
+          )}"/>`,
+      ),
+      `    <xhtml:link rel="alternate" hreflang="x-default" href="${pageUrl(
+        date,
+        snapshot.days,
+        DEFAULT_LANG,
+      )}"/>`,
+    ].join('\n');
+
+  const urls = LANGS.flatMap((lang) =>
+    snapshot.days.map(
       (date) => `  <url>
-    <loc>${pageUrl(date, snapshot.days)}</loc>
+    <loc>${pageUrl(date, snapshot.days, lang)}</loc>
+${alternates(date)}
     <lastmod>${lastmod}</lastmod>
     <changefreq>hourly</changefreq>
   </url>`,
-    )
-    .join('\n');
+    ),
+  ).join('\n');
+
   return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
 ${urls}
 </urlset>
 `;

@@ -244,6 +244,14 @@ export interface Movie {
   synopsis?: string;
   runtimeMinutes?: number;
   genres: string[];
+  /**
+   * English title and genres for the `/en/` tree (R-19.5). Absent whenever
+   * TMDb could not supply them — including when the build runs with no API key
+   * at all — in which case the English page falls back to the same scraped
+   * title the Serbian page shows.
+   */
+  titleEn?: string;
+  genresEn?: string[];
   ageRating?: AgeRating;
   /** Audience score, currently TMDb's. */
   score?: {

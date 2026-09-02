@@ -11,6 +11,7 @@
   setupInstall();
   registerServiceWorker();
   setupPosterFallback();
+  setupLanguage();
 
   if (!form || !container || !counts) return;
 
@@ -158,23 +159,15 @@
   }
 
   function readStoredCity() {
-    try {
-      var stored = window.localStorage.getItem('kokice.city');
-      for (var i = 0; i < cityTabs.length; i++) {
-        if (cityTabs[i].getAttribute('data-city') === stored) return stored;
-      }
-      return null;
-    } catch (err) {
-      return null;
+    var stored = read('kokice.city');
+    for (var i = 0; i < cityTabs.length; i++) {
+      if (cityTabs[i].getAttribute('data-city') === stored) return stored;
     }
+    return null;
   }
 
   function storeCity(cityId) {
-    try {
-      window.localStorage.setItem('kokice.city', cityId);
-    } catch (err) {
-      /* private mode; the URL still carries the choice */
-    }
+    store('kokice.city', cityId);
   }
 
   function applyCityChrome() {
@@ -267,15 +260,15 @@
       }
     }
 
-    var text = visibleMovies + ' ' + plural(visibleMovies, 'film', 'filma', 'filmova') +
-      ' · ' + visibleShowtimes + ' ' + plural(visibleShowtimes, 'projekcija', 'projekcije', 'projekcija');
+    var text =
+      countText(counts.getAttribute('data-plural-movies'), visibleMovies) +
+      ' · ' +
+      countText(counts.getAttribute('data-plural-showtimes'), visibleShowtimes);
 
     // Only the dubbed mode hides unknown-language chips - the other two show them,
     // so the notice would be describing screenings that are right there on screen.
     if (audioMode === 'dubbed' && unknownAudio > 0) {
-      text += ' · ' + unknownAudio + ' ' +
-        plural(unknownAudio, 'projekcija nema', 'projekcije nemaju', 'projekcija nema') +
-        ' naznačen jezik i nisu prikazane';
+      text += ' · ' + countText(counts.getAttribute('data-plural-unknown'), unknownAudio);
     }
     counts.textContent = text;
 
@@ -289,12 +282,27 @@
     syncUrl(audioMode, kidsOnly, searchInput ? searchInput.value : '');
   }
 
-  function plural(n, one, few, many) {
+  // The page ships its own plural templates ("{n} film|{n} filma|{n} filmova"),
+  // so this file holds no display copy and needs no per-language build.
+  var pluralRule = counts.getAttribute('data-plural-rule') === 'en' ? 'en' : 'sr';
+
+  function countText(template, n) {
+    var forms = String(template || '{n}').split('|');
+    var index = pluralRule === 'en' ? enForm(n) : srForm(n);
+    var form = forms[Math.min(index, forms.length - 1)];
+    return form.replace('{n}', n);
+  }
+
+  function enForm(n) {
+    return n === 1 ? 0 : 1;
+  }
+
+  function srForm(n) {
     var mod10 = n % 10;
     var mod100 = n % 100;
-    if (mod10 === 1 && mod100 !== 11) return one;
-    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-    return many;
+    if (mod10 === 1 && mod100 !== 11) return 0;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 1;
+    return 2;
   }
 
   function syncUrl(audioMode, kidsOnly, rawSearch) {
@@ -312,8 +320,10 @@
     window.history.replaceState(null, '', url);
 
     // Keep city and filter state when switching days. The end-of-day message
-    // links to tomorrow too, so it is kept in step.
-    var tabs = document.querySelectorAll('.daytab, [data-daylink]');
+    // links to tomorrow too, so it is kept in step - and so does the language
+    // switcher, which is a real navigation into the other tree and would
+    // otherwise silently reset the reader's city, filters and search term.
+    var tabs = document.querySelectorAll('.daytab, [data-daylink], [data-langlink]');
     for (var i = 0; i < tabs.length; i++) {
       var href = tabs[i].getAttribute('href').split('?')[0];
       tabs[i].setAttribute('href', query ? href + '?' + query : href);
@@ -402,7 +412,12 @@
       // browser has never cached, so it always reaches the network (R-9.7b).
       var meta = document.querySelector('meta[name="sw-version"]');
       var version = meta ? meta.getAttribute('content') : '';
-      var url = version ? 'sw.js?v=' + encodeURIComponent(version) : 'sw.js';
+      // Pages in the /en/ tree sit one directory down while sw.js stays at the
+      // site root, so the path is rendered into the page rather than assumed -
+      // registering a bare 'sw.js' from /en/ asks for /en/sw.js and 404s.
+      var pathMeta = document.querySelector('meta[name="sw-path"]');
+      var path = (pathMeta && pathMeta.getAttribute('content')) || 'sw.js';
+      var url = version ? path + '?v=' + encodeURIComponent(version) : path;
       navigator.serviceWorker.register(url).catch(function () {
         /* offline support is optional */
       });
@@ -426,5 +441,57 @@
       },
       true,
     );
+  }
+
+  /**
+   * Serbian and English are separate documents, so the switcher is a real link
+   * and is never intercepted - the click navigates, this only records the
+   * choice so the next visit to the root lands in the same language.
+   *
+   * The visitor's own `navigator.language` is deliberately not consulted
+   * (R-19.6): a stored preference is something they asked for, a guessed one
+   * is something that happens to them. Only an explicit choice ever redirects,
+   * only once, and only away from the default tree - so a crawler, which has
+   * no localStorage, always sees Serbian at `/` and English at `/en/`.
+   */
+  function setupLanguage() {
+    var nav = document.getElementById('langs');
+    if (!nav) return;
+    var current = document.documentElement.lang.indexOf('sr') === 0 ? 'sr' : 'en';
+    var links = nav.querySelectorAll('[data-langlink]');
+
+    for (var i = 0; i < links.length; i++) {
+      links[i].addEventListener('click', function () {
+        store('kokice.lang', this.getAttribute('data-lang'));
+      });
+    }
+
+    if (current !== 'sr' || read('kokice.lang') !== 'en') return;
+    // Redirecting mid-session would fight a reader who just switched back, so
+    // the hop is allowed once per tab and the query string is carried across.
+    try {
+      if (window.sessionStorage.getItem('kokice.lang.hopped')) return;
+      window.sessionStorage.setItem('kokice.lang.hopped', '1');
+    } catch (err) {
+      return;
+    }
+    var target = nav.querySelector('[data-lang="en"]');
+    if (target) window.location.replace(target.getAttribute('href') + window.location.search);
+  }
+
+  function read(key) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function store(key, value) {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (err) {
+      /* private mode; the URL still carries the choice */
+    }
   }
 })();

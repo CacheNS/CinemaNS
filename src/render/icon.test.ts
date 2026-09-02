@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { MANIFEST, renderIcon } from './icon.js';
+import { manifestFor, renderIcon } from './icon.js';
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -25,13 +25,33 @@ test('the maskable icon fills the whole square', () => {
 });
 
 test('the manifest advertises the icons the pages reference', () => {
-  const sources = MANIFEST.icons.map((icon) => icon.src);
+  const manifest = manifestFor('sr');
+  const sources = manifest.icons.map((icon) => icon.src);
   assert.deepEqual(sources, [
     'assets/icon-192.png',
     'assets/icon-512.png',
     'assets/icon-maskable-512.png',
   ]);
-  assert.ok(MANIFEST.icons.some((icon) => icon.purpose === 'maskable'));
-  assert.equal(MANIFEST.display, 'standalone');
-  assert.equal(MANIFEST.start_url, './index.html');
+  assert.ok(manifest.icons.some((icon) => icon.purpose === 'maskable'));
+  assert.equal(manifest.display, 'standalone');
+  assert.equal(manifest.start_url, './index.html');
+});
+
+test('the English manifest reaches the icons at the site root, one level up', () => {
+  // It is served from /en/, but the icons are single-copy at the root (R-19.4),
+  // so a bare "assets/…" would 404 for anyone who installs the English app.
+  const manifest = manifestFor('en');
+  assert.deepEqual(
+    manifest.icons.map((icon) => icon.src),
+    [
+      '../assets/icon-192.png',
+      '../assets/icon-512.png',
+      '../assets/icon-maskable-512.png',
+    ],
+  );
+  assert.equal(manifest.lang, 'en');
+  assert.equal(manifest.name, 'Kokice');
+  assert.notEqual(manifest.description, manifestFor('sr').description);
+  // start_url stays relative, so each tree opens its own index.
+  assert.equal(manifest.start_url, './index.html');
 });

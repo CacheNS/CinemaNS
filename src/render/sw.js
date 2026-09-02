@@ -29,7 +29,16 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE).then((cache) =>
-      cache.addAll(['./', './index.html', './assets/style.css', './assets/app.js']).catch(() => undefined),
+      cache
+        .addAll([
+          './',
+          './index.html',
+          './en/',
+          './en/index.html',
+          './assets/style.css',
+          './assets/app.js',
+        ])
+        .catch(() => undefined),
     ),
   );
 });

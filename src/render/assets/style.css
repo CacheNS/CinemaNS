@@ -40,6 +40,16 @@ a { color: inherit; }
   letter-spacing: -0.01em;
 }
 
+/* The switcher sits in the top-right corner, level with the title. The h1 is
+   long enough to wrap on a phone, so it takes the free space and the tabs keep
+   their own width rather than being squeezed. */
+.header__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .subtitle {
   margin: 0.25rem 0 0;
   color: var(--muted);
@@ -67,6 +77,30 @@ a { color: inherit; }
   background: var(--accent);
   color: var(--accent-ink);
   border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* Language is a different document, not a filter, so it is visually quieter
+   than the city tabs - a corner control rather than a primary choice. */
+.langs {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+
+.langtab {
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.03em;
+}
+
+.langtab--active {
+  border-color: var(--accent);
+  color: var(--accent);
   font-weight: 600;
 }
 

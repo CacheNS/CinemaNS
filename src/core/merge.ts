@@ -223,6 +223,13 @@ export async function mergeMovies(
 
     if (group.tmdb) {
       movie.tmdbId = group.tmdb.id;
+      // English display data for the /en/ tree. Only set when it actually
+      // differs from what the Serbian page shows, so a film TMDb never
+      // localised does not carry a duplicate field into data.json.
+      if (group.tmdb.titleEn && group.tmdb.titleEn !== movie.title) {
+        movie.titleEn = group.tmdb.titleEn;
+      }
+      if (group.tmdb.genresEn?.length) movie.genresEn = group.tmdb.genresEn;
       if (group.tmdb.trailerKey) {
         movie.trailerKey = group.tmdb.trailerKey;
         if (group.tmdb.trailerLanguage) movie.trailerLanguage = group.tmdb.trailerLanguage;

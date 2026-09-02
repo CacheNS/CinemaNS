@@ -68,6 +68,29 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   survives it by never navigating at all.
 - All dates are Europe/Belgrade.
 - Never present a guessed age rating as fact.
+- **Serbian renders at `/`, English at `/en/` — two real static trees, not a
+  client-side toggle** (§19). Every string lives in `src/core/i18n.ts` behind a
+  typed `Strings` interface, so a missing English key is a compile error.
+- **`style.css`, `app.js`, the icons, `sw.js` and `data.json` are single-copy at
+  the root**; only day pages and `manifest.webmanifest` are per language. An
+  `/en/` page reaches them via `assetPrefix` (`../`). Registering a bare
+  `sw.js` from `/en/` asks for `/en/sw.js` and 404s — the path comes from
+  `<meta name="sw-path">` (R-19.4).
+- **`app.js` holds no display copy.** Plural forms arrive as `data-plural-*`
+  templates on `#counts` (`"{n} film|{n} filma|{n} filmova"`). Don't put a
+  literal string back in, and don't reach for an inline `<script>` — the CSP
+  forbids it.
+- **English text must never go through `toSerbianLatin()`** (R-19.5a); that is
+  Serbian Cyrillic→Latin only. `MONTHS` stays Serbian in both trees — it is the
+  Tuck adapter's parsing table.
+- **Genres are translated by a table, not by TMDb** (R-19.5b). They come from
+  the cinemas, so with no API key `genresEn` is absent on every film and
+  `translateGenre()` is the only thing standing between an English reader and
+  "Akcija, Triler". Unknown genres fall through untranslated on purpose, and
+  dedupe happens *after* translating — "Akcija"/"Akcijski"/"Akcioni" are one
+  genre once they are all "Action" (R-19.5c).
+- **The language preference is remembered, never guessed** — `navigator.language`
+  is deliberately not consulted (R-19.6).
 
 ## Data-accuracy rules (each one was a real bug)
 

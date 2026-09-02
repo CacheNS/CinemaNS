@@ -34,6 +34,15 @@ export interface TmdbMovie {
    * in cities where no cinema publishes a country of production.
    */
   originalLanguage?: string;
+  /**
+   * The same fields again in English, for the `/en/` tree (R-19.5). Optional
+   * throughout: a failed second request degrades the English page to the
+   * Serbian text rather than failing the build, exactly as a missing API key
+   * degrades both.
+   */
+  titleEn?: string;
+  genresEn?: string[];
+  overviewEn?: string;
 }
 
 interface SearchResponse {
@@ -336,6 +345,27 @@ export class TmdbClient {
       movie.trailerKey = trailer.key;
       movie.trailerLanguage = trailer.language;
     }
+    await this.addEnglish(movie, id);
     return movie;
+  }
+
+  /**
+   * A second, much smaller request for the English strings the `/en/` tree
+   * shows. Separate rather than `append_to_response`, because TMDb's
+   * `language` applies to the whole response and there is no way to ask for
+   * two localisations at once.
+   *
+   * Deliberately not passed through `toSerbianLatin`: it is a Cyrillic-to-Latin
+   * mapping for Serbian, and English text has nothing for it to convert
+   * (R-19.5a).
+   */
+  private async addEnglish(movie: TmdbMovie, id: number): Promise<void> {
+    const data = await fetchJson<DetailsResponse>(
+      this.url(`/movie/${id}`, { language: 'en-US' }),
+    ).catch(() => null);
+    if (!data) return;
+    if (data.title) movie.titleEn = data.title;
+    if (data.genres?.length) movie.genresEn = data.genres.map((genre) => genre.name);
+    if (data.overview) movie.overviewEn = data.overview;
   }
 }

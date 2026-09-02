@@ -174,9 +174,13 @@ test('stale-source warnings are scoped to their city', () => {
   assert.ok(today.includes(`<div class="notice notice--stale" data-city="${DEFAULT_CITY}">`));
 });
 
-test('renders one page per day, with today as index.html', () => {
+test('renders one page per day per language, with today as index.html', () => {
   const pages = renderPages(snapshot);
-  assert.deepEqual([...pages.keys()], ['index.html', '2026-08-20.html']);
+  // Serbian is the default and stays at the root; English is a parallel tree.
+  assert.deepEqual(
+    [...pages.keys()],
+    ['index.html', '2026-08-20.html', 'en/index.html', 'en/2026-08-20.html'],
+  );
 });
 
 test('shows only the films playing on that day', () => {
@@ -287,6 +291,107 @@ test('warns about stale sources', () => {
   const today = renderDayPage(snapshot, '2026-08-19');
   assert.ok(today.includes('nisu ažurni'));
   assert.ok(today.includes('CineStar BIG'));
+});
+
+test('the English page translates the chrome and declares its own locale', () => {
+  const en = renderDayPage(snapshot, '2026-08-19', '', 'en');
+  assert.ok(en.includes('<html lang="en">'));
+  assert.ok(en.includes('<meta property="og:locale" content="en_US">'));
+  assert.ok(en.includes('For kids'));
+  assert.ok(en.includes('Not dubbed'));
+  assert.ok(en.includes('Search films…'));
+  assert.ok(en.includes('data-started-label="already started"'));
+  assert.ok(en.includes('Data for some cinemas may be out of date:'));
+  // No Serbian chrome should survive into the English tree.
+  assert.ok(!en.includes('Za decu'));
+  assert.ok(!en.includes('Pretraga filmova'));
+  assert.ok(!en.includes('Poslednje osvežavanje'));
+});
+
+test('English pages reach the shared root assets one level up', () => {
+  // style.css, app.js and sw.js are single-copy at the root (R-19.4), so an
+  // /en/ page asking for a bare "assets/…" or "sw.js" would 404.
+  const en = renderDayPage(snapshot, '2026-08-19', 'abc123', 'en');
+  assert.ok(en.includes('href="../assets/style.css"'));
+  assert.ok(en.includes('src="../assets/app.js"'));
+  assert.ok(en.includes('<meta name="sw-path" content="../sw.js">'));
+  assert.ok(en.includes('href="../assets/icon-192.png"'));
+  // The manifest is the one per-language file, so it stays tree-relative.
+  assert.ok(en.includes('href="manifest.webmanifest"'));
+
+  const sr = renderDayPage(snapshot, '2026-08-19', 'abc123');
+  assert.ok(sr.includes('href="assets/style.css"'));
+  assert.ok(sr.includes('<meta name="sw-path" content="sw.js">'));
+});
+
+test('both trees cross-link with hreflang and name Serbian as x-default', () => {
+  for (const page of [
+    renderDayPage(snapshot, '2026-08-19'),
+    renderDayPage(snapshot, '2026-08-19', '', 'en'),
+  ]) {
+    assert.ok(page.includes(`<link rel="alternate" hreflang="sr-Latn-RS" href="${BASE_URL}/">`));
+    assert.ok(page.includes(`<link rel="alternate" hreflang="en" href="${BASE_URL}/en/">`));
+    assert.ok(page.includes(`<link rel="alternate" hreflang="x-default" href="${BASE_URL}/">`));
+  }
+});
+
+test('each page canonicalises to its own language tree', () => {
+  assert.ok(renderDayPage(snapshot, '2026-08-19').includes(`<link rel="canonical" href="${BASE_URL}/">`));
+  assert.ok(
+    renderDayPage(snapshot, '2026-08-19', '', 'en').includes(
+      `<link rel="canonical" href="${BASE_URL}/en/">`,
+    ),
+  );
+  assert.ok(
+    renderDayPage(snapshot, '2026-08-20', '', 'en').includes(
+      `<link rel="canonical" href="${BASE_URL}/en/2026-08-20.html">`,
+    ),
+  );
+});
+
+test('the language switcher navigates and never self-links to index.html', () => {
+  const sr = renderDayPage(snapshot, '2026-08-19');
+  assert.ok(sr.includes('<span class="langtab langtab--active" aria-current="page">SR</span>'));
+  assert.ok(sr.includes('href="en/"'));
+
+  const en = renderDayPage(snapshot, '2026-08-19', '', 'en');
+  assert.ok(en.includes('<span class="langtab langtab--active" aria-current="page">EN</span>'));
+  // Climbs out of /en/ back to the Serbian root.
+  assert.ok(en.includes('href="../"'));
+  assert.ok(renderDayPage(snapshot, '2026-08-20', '', 'en').includes('href="../2026-08-20.html"'));
+});
+
+test('the client gets its plural forms from the page, not from app.js', () => {
+  const sr = renderDayPage(snapshot, '2026-08-19');
+  assert.ok(sr.includes('data-plural-rule="sr"'));
+  // Three forms for Serbian, two for English - the count of `|` is the rule.
+  assert.ok(sr.includes('data-plural-movies="{n} film|{n} filma|{n} filmova"'));
+
+  const en = renderDayPage(snapshot, '2026-08-19', '', 'en');
+  assert.ok(en.includes('data-plural-rule="en"'));
+  assert.ok(en.includes('data-plural-movies="{n} film|{n} films"'));
+});
+
+test('the sitemap lists both trees with alternates', () => {
+  const sitemap = renderSitemap(snapshot);
+  assert.ok(sitemap.includes('xmlns:xhtml="http://www.w3.org/1999/xhtml"'));
+  assert.ok(sitemap.includes(`<loc>${BASE_URL}/</loc>`));
+  assert.ok(sitemap.includes(`<loc>${BASE_URL}/en/</loc>`));
+  assert.ok(sitemap.includes(`<loc>${BASE_URL}/en/2026-08-20.html</loc>`));
+  assert.ok(sitemap.includes('hreflang="x-default"'));
+  // One <url> per day per language.
+  assert.equal(sitemap.match(/<url>/g)?.length, snapshot.days.length * 2);
+});
+
+test('every page a day page links to is one the build actually writes', () => {
+  const pages = renderPages(snapshot, 'v1');
+  for (const [name, html] of pages) {
+    const dir = name.includes('/') ? `${name.slice(0, name.lastIndexOf('/'))}/` : '';
+    for (const href of html.matchAll(/href="([^":#?]+\.html)"/g)) {
+      const resolved = new URL(href[1]!, `https://x/${dir}`).pathname.slice(1);
+      assert.ok(pages.has(resolved), `${name} links to missing page ${href[1]}`);
+    }
+  }
 });
 
 test('an unrated film is not marked kid friendly', () => {

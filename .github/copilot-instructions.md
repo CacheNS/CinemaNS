@@ -56,6 +56,23 @@ build timestamp is the only exact freshness claim.
 - **All dates are Europe/Belgrade.** Off-by-one days are the classic bug here.
 - **Never present a guessed age rating as fact.** Heuristic ratings are marked
   `confident: false` and shown as such.
+- **Serbian is `/`, English is `/en/` — two real static trees** (§19), not a
+  client-side toggle. Strings live in `src/core/i18n.ts` behind a typed
+  interface, so a missing English key fails `tsc`.
+- **Assets, `sw.js` and `data.json` are single-copy at the root**; only day
+  pages and `manifest.webmanifest` are duplicated. `/en/` pages use `../`.
+  A bare `sw.js` registration from `/en/` 404s — read `<meta name="sw-path">`
+  (R-19.4).
+- **`app.js` carries no display copy**: plural forms come from `data-plural-*`
+  on `#counts`. No literals, and no inline `<script>` — the CSP forbids it.
+- **English never passes through `toSerbianLatin()`** (R-19.5a), and `MONTHS`
+  stays Serbian because Tuck parses with it.
+- **Genres come from the cinemas, not TMDb**, so `translateGenre()` in
+  `i18n.ts` is what makes them English (R-19.5b) — `genresEn` is empty on every
+  film while the build runs keyless. Unknown genres pass through untranslated,
+  and dedupe runs *after* translation (R-19.5c).
+- **Language is remembered, never auto-detected** from `navigator.language`
+  (R-19.6).
 
 ## Data-accuracy rules learned from auditing the live sites
 

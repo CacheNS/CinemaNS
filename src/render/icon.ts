@@ -1,5 +1,8 @@
 import { deflateSync } from 'node:zlib';
 
+import { LOCALES } from '../core/i18n.js';
+import type { Lang } from '../core/i18n.js';
+
 /**
  * Minimal RGBA PNG writer. The app ships one small generated icon set, which
  * is not worth a native image dependency in the build.
@@ -178,28 +181,65 @@ export function renderIcon(size: number, fullBleed = false): Buffer {
   return canvas.toPng();
 }
 
-export const MANIFEST = {
-  name: 'Kokice',
-  short_name: 'Kokice',
-  description:
-    'Kokice — objedinjen repertoar bioskopa u Novom Sadu i Beogradu, osvežavan više puta dnevno.',
-  lang: 'sr-Latn-RS',
-  dir: 'ltr',
-  start_url: './index.html',
-  scope: './',
-  display: 'standalone',
-  orientation: 'portrait',
-  background_color: '#0f1115',
-  theme_color: '#0f1115',
-  categories: ['entertainment', 'lifestyle'],
-  icons: [
-    { src: 'assets/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-    { src: 'assets/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-    {
-      src: 'assets/icon-maskable-512.png',
-      sizes: '512x512',
-      type: 'image/png',
-      purpose: 'maskable',
-    },
-  ],
+interface ManifestIcon {
+  src: string;
+  sizes: string;
+  type: string;
+  purpose: string;
+}
+
+export interface WebManifest {
+  name: string;
+  short_name: string;
+  description: string;
+  lang: string;
+  dir: string;
+  start_url: string;
+  scope: string;
+  display: string;
+  orientation: string;
+  background_color: string;
+  theme_color: string;
+  categories: string[];
+  icons: ManifestIcon[];
+}
+
+/**
+ * One manifest per language tree. `name`/`short_name` stay "Kokice" in both -
+ * it is the app's name, not a translated word - but `lang`, `description` and
+ * the icon paths differ, since the English manifest is served from `/en/`
+ * while the icons stay single-copy at the site root (R-19.4).
+ */
+export function manifestFor(lang: Lang): WebManifest {
+  const locale = LOCALES[lang];
+  const asset = locale.assetPrefix;
+  return {
+    name: 'Kokice',
+    short_name: 'Kokice',
+    description: MANIFEST_DESCRIPTIONS[lang],
+    lang: locale.hreflang,
+    dir: 'ltr',
+    start_url: './index.html',
+    scope: './',
+    display: 'standalone',
+    orientation: 'portrait',
+    background_color: '#0f1115',
+    theme_color: '#0f1115',
+    categories: ['entertainment', 'lifestyle'],
+    icons: [
+      { src: `${asset}assets/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: `${asset}assets/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      {
+        src: `${asset}assets/icon-maskable-512.png`,
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+    ],
+  };
+}
+
+const MANIFEST_DESCRIPTIONS: Record<Lang, string> = {
+  sr: 'Kokice — objedinjen repertoar bioskopa u Novom Sadu i Beogradu, osvežavan više puta dnevno.',
+  en: 'Kokice — cinema listings for Novi Sad and Belgrade in one place, refreshed several times a day.',
 };

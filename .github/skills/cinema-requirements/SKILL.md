@@ -43,6 +43,7 @@ claim an hourly refresh** (R-2.6a).
 | SEO (canonical, sitemap, JSON-LD) | `src/render/html.ts` (`renderSitemap`, `renderRobots`) | §18 |
 | Filters | `src/render/assets/app.js` | §7 |
 | City switch | `src/core/types.ts` (registry), `html.ts`, `app.js` | §1, §7b |
+| Languages (sr `/`, en `/en/`) | `src/core/i18n.ts`, `html.ts`, `build.ts` | §19 |
 | PWA | `src/render/icon.ts`, `sw.js` | §9 |
 | Build/deploy | `src/build.ts`, `.github/workflows/build.yml` | §3, §13 |
 | Trailers | `src/core/trailer.ts`, `src/tmdb/client.ts` | §8.10–8.11 |
@@ -79,6 +80,16 @@ claim an hourly refresh** (R-2.6a).
 9. **Europe/Belgrade for every date** (§4.6), and today's page keeps a screening
    for 60 minutes after it starts, then hides it — client-side, today only, with
    the still-listed ones muted via `data-started` (§7c).
+9a. **Serbian is `/`, English is `/en/` — two real static trees** (§19), never a
+   client-side toggle. Strings live in `src/core/i18n.ts` behind a typed
+   interface, so a forgotten English key fails `tsc`. Assets, `sw.js` and
+   `data.json` are **single-copy at the root**; `/en/` pages reach them with
+   `../`, and a bare `sw.js` registration from `/en/` 404s — use
+   `<meta name="sw-path">` (R-19.4). `app.js` holds no display copy: plural
+   forms come from `data-plural-*` on `#counts`. English never goes through
+   `toSerbianLatin()`, `MONTHS` stays Serbian (Tuck parses with it), and the
+   language preference is remembered but **never** guessed from
+   `navigator.language` (R-19.6).
 10. **Arena's `00:00` rows with an id-less `/numSale/index/` booking link are
     placeholders.** Drop them by the missing id, never by the time (§10.7a).
 11. **Every booking chip must reach a page that can sell that ticket** (§8.1a).

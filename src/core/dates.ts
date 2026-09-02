@@ -1,3 +1,6 @@
+import { DEFAULT_LANG } from './i18n.js';
+import type { Lang } from './i18n.js';
+
 export const TZ = 'Europe/Belgrade';
 
 const dateFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -45,17 +48,18 @@ export function daysBetween(a: string, b: string): number {
   return Math.round((toUtc(b) - toUtc(a)) / 86_400_000);
 }
 
-const WEEKDAYS = [
-  'nedelja',
-  'ponedeljak',
-  'utorak',
-  'sreda',
-  'četvrtak',
-  'petak',
-  'subota',
-];
+const WEEKDAYS: Record<Lang, string[]> = {
+  sr: ['nedelja', 'ponedeljak', 'utorak', 'sreda', 'četvrtak', 'petak', 'subota'],
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+};
 
-/** Serbian month names, lower-case nominative, index 0 = January. */
+/**
+ * Serbian month names, lower-case nominative, index 0 = January.
+ *
+ * Also the Tuck adapter's parsing table, not only a display list — it reads
+ * month names straight off the scraped page — so this array must stay Serbian
+ * whatever language the page is rendered in.
+ */
 export const MONTHS = [
   'januar',
   'februar',
@@ -71,31 +75,65 @@ export const MONTHS = [
   'decembar',
 ];
 
+const DISPLAY_MONTHS: Record<Lang, string[]> = {
+  sr: MONTHS,
+  en: [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ],
+};
+
+const RELATIVE_DAYS: Record<Lang, { today: string; tomorrow: string }> = {
+  sr: { today: 'danas', tomorrow: 'sutra' },
+  en: { today: 'today', tomorrow: 'tomorrow' },
+};
+
 function weekdayIndex(date: string): number {
   const [y, m, d] = date.split('-').map(Number);
   return new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay();
 }
 
-/** "petak, 21. avgust" — or "danas" / "sutra" when close. */
-export function formatDayLabel(date: string, today: string = localDate()): string {
+/** "petak, 21. avgust" / "Friday, 21 August" — or "danas"/"sutra" when close. */
+export function formatDayLabel(
+  date: string,
+  today: string = localDate(),
+  lang: Lang = DEFAULT_LANG,
+): string {
   const delta = daysBetween(today, date);
-  if (delta === 0) return 'danas';
-  if (delta === 1) return 'sutra';
+  if (delta === 0) return RELATIVE_DAYS[lang].today;
+  if (delta === 1) return RELATIVE_DAYS[lang].tomorrow;
   const [, m, d] = date.split('-').map(Number);
-  return `${WEEKDAYS[weekdayIndex(date)]}, ${d}. ${MONTHS[m! - 1]}`;
+  const weekday = WEEKDAYS[lang][weekdayIndex(date)];
+  const month = DISPLAY_MONTHS[lang][m! - 1];
+  return lang === 'en' ? `${weekday}, ${d} ${month}` : `${weekday}, ${d}. ${month}`;
 }
 
-/** "pet 21.8." — compact form used in the day tabs. */
-export function formatDayShort(date: string, today: string = localDate()): string {
+/** "pet 21.8." / "Fri 21/8" — compact form used in the day tabs. */
+export function formatDayShort(
+  date: string,
+  today: string = localDate(),
+  lang: Lang = DEFAULT_LANG,
+): string {
   const delta = daysBetween(today, date);
   const [, m, d] = date.split('-').map(Number);
-  if (delta === 0) return `danas ${d}.${m}.`;
-  if (delta === 1) return `sutra ${d}.${m}.`;
-  return `${WEEKDAYS[weekdayIndex(date)]!.slice(0, 3)} ${d}.${m}.`;
+  const stamp = lang === 'en' ? `${d}/${m}` : `${d}.${m}.`;
+  if (delta === 0) return `${RELATIVE_DAYS[lang].today} ${stamp}`;
+  if (delta === 1) return `${RELATIVE_DAYS[lang].tomorrow} ${stamp}`;
+  return `${WEEKDAYS[lang][weekdayIndex(date)]!.slice(0, 3)} ${stamp}`;
 }
 
-/** "21.08.2026. u 18:32" — used for the build timestamp. */
-export function formatTimestamp(iso: string): string {
+/** "21.08.2026. u 18:32" / "21/08/2026 at 18:32" — used for the build timestamp. */
+export function formatTimestamp(iso: string, lang: Lang = DEFAULT_LANG): string {
   const parts = new Intl.DateTimeFormat('sr-Latn-RS', {
     timeZone: TZ,
     day: '2-digit',
@@ -106,7 +144,10 @@ export function formatTimestamp(iso: string): string {
     hour12: false,
   }).formatToParts(new Date(iso));
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
-  return `${get('day')}.${get('month')}.${get('year')}. u ${get('hour')}:${get('minute')}`;
+  const time = `${get('hour')}:${get('minute')}`;
+  return lang === 'en'
+    ? `${get('day')}/${get('month')}/${get('year')} at ${time}`
+    : `${get('day')}.${get('month')}.${get('year')}. u ${time}`;
 }
 
 /** Normalizes "9:05", "09.05", "9h05" to "09:05". Returns null if unparseable. */
