@@ -14,6 +14,33 @@
 const VERSION = '__CACHE_VERSION__';
 const CACHE = `kokice-${VERSION}`;
 
+const SHELL = [
+  './',
+  './index.html',
+  './en/',
+  './en/index.html',
+  './assets/style.css',
+  './assets/app.js',
+];
+
+/**
+ * Every request this worker makes to fill its own cache must skip the browser's
+ * HTTP cache, because GitHub Pages serves the assets with `max-age=14400`
+ * (measured) and `sw.js` with the same.
+ *
+ * Without this, bumping VERSION changed the cache *key* but not the cached
+ * *bytes*: the new worker installed correctly (R-9.7b), then re-filled its
+ * brand-new cache from the four-hour-old HTTP cache entries and served that
+ * stale CSS/JS cache-first until the TTL expired. That is the "I still see the
+ * old page after a deploy" report, and why bumping the version alone never
+ * fixed it. Reproduced in Chrome against a `max-age=14400` server: a default
+ * `cache.addAll` stored the previous build's bytes, `{ cache: 'reload' }`
+ * stored the current ones.
+ */
+function uncached(request) {
+  return new Request(request, { cache: 'reload' });
+}
+
 /**
  * Only a successful, same-origin response is worth storing. Without this gate a
  * 404 or a 500 from a bad deploy gets cached and then served back offline as if
@@ -29,16 +56,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE).then((cache) =>
-      cache
-        .addAll([
-          './',
-          './index.html',
-          './en/',
-          './en/index.html',
-          './assets/style.css',
-          './assets/app.js',
-        ])
-        .catch(() => undefined),
+      cache.addAll(SHELL.map((url) => uncached(new Request(url)))).catch(() => undefined),
     ),
   );
 });
@@ -63,7 +81,11 @@ self.addEventListener('fetch', (event) => {
 
   if (isDocument) {
     event.respondWith(
-      fetch(request)
+      // Revalidated rather than reloaded: pages carry `max-age=600`, so a plain
+      // fetch() makes "network-first" a lie for ten minutes and delays the
+      // whole update chain, since the HTML is what carries the sw-version tag.
+      // 'no-cache' still allows a cheap 304 when nothing changed.
+      fetch(new Request(request, { cache: 'no-cache' }))
         .then((response) => {
           if (isCacheable(response)) {
             const copy = response.clone();
@@ -80,7 +102,9 @@ self.addEventListener('fetch', (event) => {
     caches.match(request).then(
       (cached) =>
         cached ??
-        fetch(request).then((response) => {
+        // A miss right after a version bump is exactly the case that must not
+        // be answered out of the stale HTTP cache.
+        fetch(uncached(request)).then((response) => {
           if (isCacheable(response)) {
             const copy = response.clone();
             caches.open(CACHE).then((cache) => cache.put(request, copy));

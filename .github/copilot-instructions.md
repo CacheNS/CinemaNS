@@ -172,6 +172,13 @@ These look like trivia, but each one was a real bug. See §10 of
   new bytes, and only "clear site data" fixed it for a real visitor. A
   version-tagged URL was never cached before, so it always reaches the
   network (R-9.7b).
+- **`sw.js` never fills its cache through the HTTP cache** (R-9.7c). Assets
+  are served with `max-age=14400`, so a default `cache.addAll` writes the
+  *previous* build's bytes into the *new* cache key — key changed, bytes
+  didn't — which is the recurring "still stale after a deploy" bug. Shell and
+  asset fetches go through `uncached()` (`cache: 'reload'`); documents use
+  `cache: 'no-cache'`, since `max-age=600` otherwise makes "network-first"
+  untrue for ten minutes. A bare `fetch(request)` fails `build.test.ts`.
 
 ## Security (§17)
 

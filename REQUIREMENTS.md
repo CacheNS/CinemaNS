@@ -637,6 +637,35 @@ browser has never cached always reaches the network regardless of the
 response header, so a content change is visible on the very next page load
 instead of waiting out the cache lifetime.
 
+**R-9.7c Every fetch the worker makes to fill its own cache must bypass the
+browser's HTTP cache.** R-9.7a and R-9.7b between them made the worker
+*update*; they did not make it fetch *new bytes*. Measured on the live site:
+
+| Path | `Cache-Control` |
+|---|---|
+| `/`, `/en/` | `max-age=600` |
+| `/assets/style.css`, `/assets/app.js`, `/sw.js` | `max-age=14400` |
+
+The failure chain, which is the recurring "I still see the old page after a
+deploy" report: a deploy changes `style.css`, so `VERSION` changes, so the
+cache key changes and `sw.js`'s bytes change; the page registers
+`sw.js?v=<new>` and the new worker installs correctly (R-9.7b); its `install`
+then runs `cache.addAll([… './assets/style.css', './assets/app.js'])` with the
+**default** cache mode, which is served out of the four-hour-old HTTP cache;
+`activate` deletes the old Cache Storage entry. The reader now sits on a
+brand-new cache key filled with the previous build's CSS and JS, and stays
+there until the HTTP TTL expires — **the key changed, the bytes did not**,
+which is exactly why bumping the version never fixed it.
+
+Reproduced in Chrome against a `max-age=14400` server: after the file changed,
+a default `cache.addAll` stored the previous bytes while
+`new Request(url, { cache: 'reload' })` stored the current ones. So the shell
+precache and the runtime asset miss both go through `uncached()`
+(`cache: 'reload'`), and document fetches use `cache: 'no-cache'` — without
+that, `max-age=600` makes "network-first" untrue for ten minutes and delays
+the whole update chain, since the HTML is what carries the `sw-version` tag.
+`build.test.ts` fails on a bare `fetch(request)` in `sw.js` for this reason.
+
 **R-9.8** `setupInstall()` and `registerServiceWorker()` must run **before** any
 filter early-return in `app.js`.
 

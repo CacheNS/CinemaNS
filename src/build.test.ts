@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { computeAssetVersion, renderServiceWorker } from './build.js';
 
@@ -40,4 +43,26 @@ test('the embedded page version matches the service worker cache version', () =>
   const sw = renderServiceWorker(template, assets);
 
   assert.ok(sw.includes(`'${version}'`), 'sw.js must embed the same hash computeAssetVersion returns');
+});
+
+// Regression for the other half of the same incident (R-9.7c). Bumping the
+// cache key is useless if the worker then refills the new cache through the
+// browser's HTTP cache, which holds the assets for four hours on GitHub Pages:
+// the key changes, the bytes do not, and the reader keeps seeing the old page.
+// Reproduced in Chrome against a max-age=14400 server — a default cache.addAll
+// stored the previous build's bytes.
+test('the worker never fills its cache through the HTTP cache', async () => {
+  // sw.js is a static asset, not compiled, so it is read from src/ the same
+  // way build.ts reads it — tests run out of lib/, one level below the root.
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const source = await readFile(path.join(root, 'src', 'render', 'sw.js'), 'utf8');
+
+  // Every fetch that can populate Cache Storage has to opt out of the HTTP
+  // cache; only the offline fallback reads from Cache Storage instead.
+  assert.match(source, /cache: 'reload'/, 'shell and asset fetches must bypass the HTTP cache');
+  assert.match(source, /cache: 'no-cache'/, 'document fetches must revalidate, not use max-age');
+  assert.ok(
+    !/[^.]\bfetch\(request\)/.test(source),
+    'a bare fetch(request) reintroduces the stale-bytes bug; wrap it in a Request with a cache mode',
+  );
 });

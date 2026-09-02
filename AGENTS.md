@@ -189,6 +189,14 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   ever fetching the new bytes. Only "clear site data" fixed it for a real
   visitor. A version-tagged URL was never cached before, so it always reaches
   the network (R-9.7b).
+- **Every fetch `sw.js` makes to fill its own cache bypasses the HTTP cache**
+  (R-9.7c) — `uncached()` wraps them in `{ cache: 'reload' }`, documents use
+  `{ cache: 'no-cache' }`. GitHub Pages serves the assets with
+  `max-age=14400`, so a default `cache.addAll` refills the *new* cache key
+  with the *previous* build's bytes: the key changes, the bytes do not, and
+  the reader keeps seeing the old page for four hours. This is the recurring
+  "still stale after a deploy" report, and why bumping the version alone
+  never fixed it. A bare `fetch(request)` in `sw.js` fails `build.test.ts`.
 
 ## Security (§17)
 
