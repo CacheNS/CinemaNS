@@ -405,7 +405,10 @@ mutes it (`opacity: .55`, dashed border, restored on hover). It is deliberately
 not struck through — the chip is a working booking link that often still sells.
 The wording comes from `data-started-label` on `#movies`, not from `app.js`, so
 the script holds no display copy; it is appended to the chip's existing `title`
-and removed again when the screening ages out.
+and removed again when the screening ages out. Since R-8.3a removed the
+per-audio border tints, **this is now the only thing that varies a chip's
+border**, which is exactly what makes it readable — reintroducing any other
+chip colouring would take that back.
 
 **R-7c.3 Today only.** Past days are left intact, so a shared or cached link to
 an earlier day still reads as a record of that day rather than an empty page.
