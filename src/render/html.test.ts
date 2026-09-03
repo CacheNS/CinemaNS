@@ -449,6 +449,23 @@ test('marks a premium screen on the chip and on the card badge', () => {
   assert.match(today, /<a class="showtime showtime--premium"\s+href="https:\/\//);
 });
 
+// Regression: Odiseja is IMAX at Cineplexx Galerija and 2D everywhere else, so
+// a Novi Sad reader saw an IMAX pill above a chip list that held no IMAX
+// screening. The badge was derived from every showtime in both cities and had
+// no attributes for apply() to filter on.
+test('a variant badge that only plays in another city starts hidden', () => {
+  const today = renderDayPage(snapshot, '2026-08-19');
+
+  // "Samo u Beogradu" plays only at cinestar-beograd-ada.
+  assert.match(
+    today,
+    /data-format="2D" data-audio="subtitled" hidden>2D · titlovano<\/span>/,
+    'a Beograd-only variant must be pre-hidden for the default city',
+  );
+  // Vajana's 3D screening is in Novi Sad, so its badge ships visible.
+  assert.match(today, /data-format="3D" data-audio="subtitled">3D · titlovano<\/span>/);
+});
+
 test('colour-codes the running time', () => {
   assert.equal(runtimeBucket(89), 'short');
   assert.equal(runtimeBucket(90), 'medium');

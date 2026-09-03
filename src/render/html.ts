@@ -404,14 +404,25 @@ function renderMovie(movie: Movie, date: string, t: Strings, lang: Lang): string
 
   // Format and audio belong together: the same film runs 2D dubbed in the
   // afternoon and 3D subtitled at night, and that pairing is what people pick by.
-  const variants = [
-    ...new Map(
-      showtimes.map((showtime) => [
-        `${showtime.format}|${showtime.audio}`,
-        { format: showtime.format, audio: showtime.audio },
-      ]),
-    ).values(),
-  ].sort((a, b) => a.format.localeCompare(b.format) || a.audio.localeCompare(b.audio));
+  // Each variant remembers the cities it plays in, because a badge that outlives
+  // its own showtimes is a false advertisement: Odiseja is IMAX in Beograd only,
+  // and a Novi Sad reader was shown the IMAX pill above an all-2D chip list.
+  const variantsByKey = new Map<
+    string,
+    { format: string; audio: Showtime['audio']; cities: Set<string> }
+  >();
+  for (const showtime of showtimes) {
+    const key = `${showtime.format}|${showtime.audio}`;
+    let variant = variantsByKey.get(key);
+    if (!variant) {
+      variant = { format: showtime.format, audio: showtime.audio, cities: new Set() };
+      variantsByKey.set(key, variant);
+    }
+    variant.cities.add(CINEMAS[showtime.cinemaId].city);
+  }
+  const variants = [...variantsByKey.values()].sort(
+    (a, b) => a.format.localeCompare(b.format) || a.audio.localeCompare(b.audio),
+  );
 
   const hasDubbed = showtimes.some((showtime) => showtime.audio === 'dubbed');
   const minAge = movie.ageRating?.minAge ?? -1;
@@ -473,7 +484,11 @@ function renderMovie(movie: Movie, date: string, t: Strings, lang: Lang): string
               (variant) =>
                 `<span class="badge badge--variant badge--${variant.audio}${
                   isPremiumFormat(variant.format) ? ' badge--premium' : ''
-                }">${escapeHtml(variant.format)} · ${escapeHtml(
+                }" data-variant data-format="${escapeHtml(
+                  variant.format,
+                )}" data-audio="${variant.audio}"${
+                  variant.cities.has(DEFAULT_CITY) ? '' : ' hidden'
+                }>${escapeHtml(variant.format)} · ${escapeHtml(
                   audioLabel(variant.audio, t),
                 )}</span>`,
             )

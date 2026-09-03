@@ -26,7 +26,7 @@ exact freshness claim.
 ## Commands
 
 ```
-npm test          # 175 tests, fixtures only, no network
+npm test          # 177 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -188,6 +188,15 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   very word it describes so it needs no legend, and it deliberately leaves the
   border to R-7c.2a. Colouring the border here would put both signals in one
   channel and neither would survive.
+- **A variant badge is filtered like the chips it summarises** (R-8.3c). Badges
+  are built from every showtime on the card in *both* cities, while the chips
+  below are filtered by city, audio and the grace window — so the badge row
+  drifts out of sync. Live example: *Odiseja* is IMAX only at Cineplexx
+  Galerija, so Novi Sad showed an IMAX pill over an all-2D chip list. Each
+  badge carries `data-variant`/`data-format`/`data-audio`, `apply()` reveals one
+  only when a matching chip survived, and a variant absent from `DEFAULT_CITY`
+  renders `hidden` so the no-JS page stays correct (R-15.8). The text is still
+  rendered by the build — `app.js` toggles visibility, it never composes copy.
 - A badge's classes go on the single outermost element, never on a `<span>`
   nested inside a wrapping `<a>`. `.badges` is a flex row with the default
   `align-items: stretch`, so only a direct flex child gets stretched to match

@@ -537,6 +537,24 @@ the very word it describes so it needs no legend, and leaves the border free for
 R-7c.2a. Colouring the border here would put the premium signal and the
 grace-window signal in the same channel, and neither would survive it.
 
+**R-8.3c A variant badge never outlives its own showtimes.** The badges are
+derived from every showtime on the card, across both cities, but the chip list
+below them is filtered by city, audio and the grace window — so a badge could
+advertise a screening that was nowhere in the list. Found live: *Odiseja* is
+IMAX at Cineplexx Galerija and 2D at all nine other venues, so a Novi Sad reader
+got an accented IMAX pill above an all-2D chip list. R-8.3b made it prominent;
+the mismatch predates it.
+
+Each badge therefore carries `data-variant`, `data-format` and `data-audio`, and
+`apply()` shows one only when a chip with the same format+audio survived
+filtering — which fixes the audio filter and the grace window in the same
+stroke, not just the city switch. Server-side, a variant that does not play in
+`DEFAULT_CITY` renders `hidden`, because R-15.8 requires the no-JS page to be
+correct for the default city and JS to only ever reveal.
+
+The badge text is still rendered by the build, never assembled in `app.js`
+(R-19): the client toggles visibility, it does not compose copy.
+
 **R-8.4 Runtime traffic light**, as its own badge:
 
 | Runtime | Colour |
@@ -861,7 +879,7 @@ started chip (R-7c.2b), since `app.js` has no other test coverage.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **175 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **177 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same

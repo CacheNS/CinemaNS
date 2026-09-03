@@ -390,6 +390,8 @@ main {
   white-space: nowrap;
 }
 
+.badge[hidden] { display: none; }
+
 .badge--age { font-weight: 600; }
 .badge--kid { color: var(--kid); border-color: rgba(110, 231, 168, 0.4); }
 .badge--teen { color: var(--teen); border-color: rgba(255, 201, 77, 0.4); }

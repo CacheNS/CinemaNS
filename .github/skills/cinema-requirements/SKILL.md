@@ -215,7 +215,7 @@ claim an hourly refresh** (R-2.6a).
 
 ```
 npx tsc --noEmit
-npm test          # 175 tests, fixtures only, no network
+npm test          # 177 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```

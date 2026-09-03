@@ -79,3 +79,14 @@ test('a started showtime chip loses its href', async () => {
   assert.match(source, /removeAttribute\('href'\)/, 'a started chip must not stay clickable');
   assert.match(source, /aria-disabled/, 'assistive tech needs the same signal as the muting');
 });
+
+// R-8.3c. A variant badge is derived from every showtime in both cities, so it
+// outlives its own chips unless apply() re-checks it: Odiseja showed an IMAX
+// pill in Novi Sad, where it only ever played 2D.
+test('variant badges are re-checked against the visible chips', async () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const source = await readFile(path.join(root, 'src', 'render', 'assets', 'app.js'), 'utf8');
+
+  assert.match(source, /\[data-variant\]/, 'apply() must reach the badges');
+  assert.match(source, /liveVariants/, 'badge visibility must follow the surviving chips');
+});

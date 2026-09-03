@@ -224,6 +224,9 @@
       }
 
       var shownInMovie = 0;
+      // Which format+audio pairings survive filtering, so the card's variant
+      // badges can never advertise a screening the chip list no longer shows.
+      var liveVariants = {};
       var cinemas = movie.querySelectorAll('.cinema');
       for (var j = 0; j < cinemas.length; j++) {
         var cinema = cinemas[j];
@@ -258,10 +261,21 @@
               : audioMode === 'subtitled' && audio === 'dubbed';
           var hide = past || wrongAudio;
           showtime.hidden = hide;
-          if (!hide) shownInCinema++;
+          if (!hide) {
+            shownInCinema++;
+            liveVariants[showtime.getAttribute('data-format') + '|' + audio] = 1;
+          }
         }
         cinema.hidden = shownInCinema === 0;
         shownInMovie += shownInCinema;
+      }
+
+      var badges = movie.querySelectorAll('[data-variant]');
+      for (var v = 0; v < badges.length; v++) {
+        var badge = badges[v];
+        badge.hidden = !liveVariants[
+          badge.getAttribute('data-format') + '|' + badge.getAttribute('data-audio')
+        ];
       }
 
       movie.hidden = shownInMovie === 0;
