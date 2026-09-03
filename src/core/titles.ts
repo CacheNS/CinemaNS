@@ -256,16 +256,45 @@ export function detectAudio(...labels: (string | undefined | null)[]): Audio {
   return 'unknown';
 }
 
+/**
+ * The premium screens, most specific first, in one place so free-text labels
+ * and CineStar's slash-separated codes can never disagree about the ladder.
+ * `pattern` reads prose, `code` matches an already-tokenised format string;
+ * "Gold" needs "class" in prose because a film may simply be called Gold.
+ */
+const PREMIUM_LADDER = [
+  { name: '4DX', pattern: /\b4dx\b/, code: '4DX' },
+  { name: 'IMAX', pattern: /\bimax\b/, code: 'IMAX' },
+  { name: 'ScreenX', pattern: /screen ?x/, code: 'SCREENX' },
+  { name: 'Gold', pattern: /gold ?class/, code: 'GOLD' },
+  { name: 'VIP', pattern: /\bvip\b/, code: 'VIP' },
+] as const;
+
+/**
+ * A premium format composes with 3D rather than replacing it (R-10.2): the
+ * glasses are half of what the reader is choosing between.
+ */
+export function composeFormat(premium: string | undefined, is3d: boolean): string {
+  if (premium && is3d) return `${premium} 3D`;
+  return premium ?? (is3d ? '3D' : '2D');
+}
+
+/** The premium screen named by these upper-case tokens, if any. */
+export function premiumFromTokens(tokens: readonly string[]): string | undefined {
+  return PREMIUM_LADDER.find((entry) => tokens.includes(entry.code))?.name;
+}
+
+/** True when a composed format string leads with a premium screen. */
+export function isPremiumFormat(format: string): boolean {
+  const head = format.split(' ')[0];
+  return PREMIUM_LADDER.some((entry) => entry.name === head);
+}
+
 /** Pulls format markers (3D, IMAX, 4DX, …) out of arbitrary labels. */
 export function detectFormat(...labels: (string | undefined | null)[]): string {
   const haystack = transliterate(labels.filter(Boolean).join(' ')).toLowerCase();
-  if (/\b4dx\b/.test(haystack)) return '4DX';
-  if (/\bimax\b/.test(haystack)) return 'IMAX';
-  if (/screen ?x/.test(haystack)) return 'ScreenX';
-  if (/gold ?class/.test(haystack)) return 'Gold';
-  if (/\bvip\b/.test(haystack)) return 'VIP';
-  if (/\b3d\b/.test(haystack)) return '3D';
-  return '2D';
+  const premium = PREMIUM_LADDER.find((entry) => entry.pattern.test(haystack))?.name;
+  return composeFormat(premium, /\b3d\b/.test(haystack));
 }
 
 /** Extracts a 4-digit release year if the title or label carries one. */

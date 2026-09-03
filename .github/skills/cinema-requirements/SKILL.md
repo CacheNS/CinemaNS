@@ -74,12 +74,16 @@ claim an hourly refresh** (R-2.6a).
    `original_language == 'sr'` is a second signal for Beograd (§10.5.1) —
    Serbian only, since a Croatian film is not "domaći".
 6. **`4DX/3D/TITL` is `"4DX 3D"`** — premium formats compose with 3D (§10.2).
+   One ordered ladder in `core/titles.ts` serves both `detectFormat()` (prose)
+   and CineStar's `formatFromCode()` (codes); `detectFormat()` used to return on
+   first match and silently dropped the 3D everywhere but CineStar.
 7. **`DS` is not a dubbing marker; CineStar's `.age` is genre** (§10.6–10.7).
 8. **Parse Arena by DOM label, not body regex** — its rows run together
    (§10.8).
 9. **Europe/Belgrade for every date** (§4.6), and today's page keeps a screening
    for 60 minutes after it starts, then hides it — client-side, today only, with
-   the still-listed ones muted via `data-started` (§7c).
+   the still-listed ones muted via `data-started` and **stripped of their
+   `href`**, since those seats are off sale (§7c.2b).
 9a. **Serbian is `/`, English is `/en/` — two real static trees** (§19), never a
    client-side toggle. Strings live in `src/core/i18n.ts` behind a typed
    interface, so a forgotten English key fails `tsc`. Assets, `sw.js` and
@@ -211,7 +215,7 @@ claim an hourly refresh** (R-2.6a).
 
 ```
 npx tsc --noEmit
-npm test          # 152 tests, fixtures only, no network
+npm test          # 175 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```
@@ -273,8 +277,11 @@ change isn't finished yet.
   day. Today's page keeps a screening for an hour after it starts and then hides
   it, client-side, so a late-evening page going empty is the correct answer, not
   a bug. The grace period exists because you can still walk into a film that
-  began twenty minutes ago; those chips are muted, never struck through, because
-  they are working booking links (§7c.2a).
+  began twenty minutes ago; those chips are muted and never struck through, but
+  they do lose their `href` — you can walk in, you can no longer buy online
+  (§7c.2a–b). Premium screens are accented on the format *word*
+  (`.showtime__format`), never on the border, so the grace-window muting stays
+  the only border variation (§8.3b).
 - **Both cities share one page on purpose** (§7b.2). The payload objection was
   measured, not assumed: measured on production, a full day page carrying both
   cities is 157 KB raw but **10.0 KB over the wire** (15.7× gzip, and GitHub

@@ -401,14 +401,36 @@ The boundary is inclusive: a screening exactly 60 minutes old is still shown.
 **R-7c.2a A screening inside the grace window is visibly marked**, because
 otherwise the reader cannot tell that a listed 19:15 film is already 40 minutes
 in. The client sets `data-started` on the chip and `.showtime[data-started]`
-mutes it (`opacity: .55`, dashed border, restored on hover). It is deliberately
-not struck through — the chip is a working booking link that often still sells.
-The wording comes from `data-started-label` on `#movies`, not from `app.js`, so
-the script holds no display copy; it is appended to the chip's existing `title`
-and removed again when the screening ages out. Since R-8.3a removed the
-per-audio border tints, **this is now the only thing that varies a chip's
-border**, which is exactly what makes it readable — reintroducing any other
-chip colouring would take that back.
+mutes it (`opacity: .55`, dashed border, `cursor: default`, opacity restored on
+hover). It is deliberately not struck through — the chip still tells you what is
+playing, and the muting has to stay readable rather than decorative. The wording
+comes from `data-started-label` on `#movies`, not from `app.js`, so the script
+holds no display copy; it is appended to the chip's existing `title` and removed
+again when the screening ages out. Since R-8.3a removed the per-audio border
+tints, **this is still the only thing that varies a chip's border** — R-8.3b's
+premium accent deliberately colours the format *word* instead, so as not to take
+that back.
+
+**R-7c.2b A started chip is not a link.** Those seats are off sale, so a chip
+that still navigated would land the reader on a booking page that cannot serve
+it. `markStarted()` stashes the `href` in `data-href`, removes the attribute and
+sets `aria-disabled="true"`; an `<a>` with no `href` is neither clickable nor
+focusable, so no `pointer-events` rule or key handling is needed, and the
+`:hover` border accent is neutralised for the same reason. The href is restored
+from `data-href` on the reverse transition rather than being discarded.
+
+This reverses the earlier rule, which held that the chip was "a working booking
+link that often still sells" — R-7c.2's grace period keeps the *screening*
+listed because you can still walk in, but that is not the same claim as the
+*ticket* still being purchasable online, and it was the second claim that was
+wrong.
+
+Because only the browser knows the time, `renderShowtime()` still emits a real
+`<a href>` and the un-linking happens client-side. A no-JS reader therefore
+keeps a live link — the same harmless-superset degradation the audio filter
+already accepts, and preferable to shipping a dead chip to everyone.
+`build.test.ts` pins the `data-href` stash, since this is one deleted line away
+from silently reverting.
 
 **R-7c.3 Today only.** Past days are left intact, so a shared or cached link to
 an earlier day still reads as a record of that day rather than an empty page.
@@ -499,6 +521,21 @@ the colour added no information. The only border treatment left on a chip is
 the grace-window muting of R-7c.2a, which now reads unambiguously because it is
 the sole variation. Do not reintroduce per-audio colours; `data-audio` stays,
 since the filter reads it (R-8.9).
+
+**R-8.3b A premium screen is accented on the chip, on the word, never on the
+border.** IMAX / 4DX / ScreenX / Gold / VIP change the price and the room, so
+they are what a reader scans a row of chips for — but `IMAX · titl.` in 0.65rem
+muted grey reads exactly like `2D · titl.`. `renderShowtime()` therefore wraps
+the format in its own `.showtime__format` span and adds `showtime--premium`,
+and the CSS accents that span alone; the card's variant badge gets a matching
+`badge--premium`. The chip also carries `data-format`.
+
+This is not a re-run of the R-8.3a mistake. That tint sat on the **border**,
+encoded four audio states in two colours, and duplicated information already
+spelled out in words. This one is a binary premium/ordinary distinction, sits on
+the very word it describes so it needs no legend, and leaves the border free for
+R-7c.2a. Colouring the border here would put the premium signal and the
+grace-window signal in the same channel, and neither would survive it.
 
 **R-8.4 Runtime traffic light**, as its own badge:
 
@@ -682,6 +719,19 @@ Cineplexx 215/215.
 **R-10.2 Format must not be lost.** Premium formats compose with 3D:
 `4DX/3D/TITL` ⇒ `"4DX 3D"`, not `"4DX"`.
 
+This held only for CineStar for a long time. `detectFormat()` — which every
+other adapter uses — returned on its first match, so Cineplexx sessions whose
+`technologies` array genuinely carried both tokens rendered as a bare `"4DX"`,
+and the glasses were dropped from the chip, the card badge and `data.json`.
+Both paths now share one ordered premium ladder in `core/titles.ts`
+(`composeFormat()` / `premiumFromTokens()`), so they cannot drift again;
+`formatFromCode()` is a thin wrapper over it. `isPremiumFormat()` reads the
+leading token of the composed string, which is what R-8.3b's accent keys off.
+
+The ladder holds two matchers per screen on purpose: a regex for prose and an
+exact token for CineStar's slash-separated codes. `Gold` still requires the word
+"class" in prose, because a film may simply be titled *Gold*.
+
 **R-10.3 Metadata source ranking.** When cinemas disagree about metadata,
 prefer the more trustworthy source: **cineplexx → cinestar → tuck → arena**.
 Applies to `originalTitle` and `runtimeMinutes`.
@@ -800,15 +850,18 @@ per-adapter dubbing detection, and each adapter's parser using saved
 fixtures. **No network in tests.**
 
 **R-12.2** Regression tests exist for every audit finding in §10 and must stay:
-`formatFromCode('4DX/3D/TITL') === '4DX 3D'`; `parseArenaOriginCountry` against
-run-on markup; merge prefers Cineplexx runtime and CineStar original title over
-Arena's; a domestic film's showtimes all become `original`.
+`formatFromCode('4DX/3D/TITL') === '4DX 3D'` and the same composition through
+`detectFormat()` (R-10.2, which the latter got wrong for a long time);
+`parseArenaOriginCountry` against run-on markup; merge prefers Cineplexx runtime
+and CineStar original title over Arena's; a domestic film's showtimes all become
+`original`. `build.test.ts` also pins the `data-href` stash that un-links a
+started chip (R-7c.2b), since `app.js` has no other test coverage.
 
 **R-12.3** Tests must reproduce the *real* markup shape. The first
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **150 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **175 tests passing**, `tsc --noEmit` clean.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same

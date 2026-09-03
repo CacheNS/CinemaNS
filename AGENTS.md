@@ -26,7 +26,7 @@ exact freshness claim.
 ## Commands
 
 ```
-npm test          # 152 tests, fixtures only, no network
+npm test          # 175 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -56,8 +56,12 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   it — in the browser, Belgrade time, today only (`GRACE_MINUTES`, R-7c.2). The
   chains disagree about how much of the past they publish, so consistency is our
   rule, not theirs. A chip inside the grace window is muted via `data-started`
-  (R-7c.2a) rather than struck through, since it is still a live booking link.
-  Late in the evening the page legitimately goes empty.
+  (R-7c.2a) rather than struck through, and **loses its `href`** (R-7c.2b): you
+  can still walk into the screening, but you can no longer buy the ticket, and
+  the old rule claiming it was "a working booking link" was simply wrong. The
+  server still renders a real `<a href>` — only the browser knows the time — so
+  a no-JS reader keeps the link, the same harmless superset the audio filter
+  accepts. Late in the evening the page legitimately goes empty.
 - Every city but the default renders pre-hidden and JS only ever *reveals*. A
   no-JS reader must get a correct single-city page, never a mix.
 - A search box above the listing filters `.movie` cards instantly on keystroke,
@@ -94,7 +98,11 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
 
 ## Data-accuracy rules (each one was a real bug)
 
-- `4DX/3D/TITL` ⇒ `"4DX 3D"`; premium formats compose with 3D.
+- `4DX/3D/TITL` ⇒ `"4DX 3D"`; premium formats compose with 3D. One ordered
+  ladder in `core/titles.ts` (`composeFormat`/`premiumFromTokens`) backs both
+  `detectFormat()` and CineStar's `formatFromCode()` — before that,
+  `detectFormat()` returned on first match and dropped the 3D from every
+  Cineplexx/Arena/Tuck chip (R-10.2).
 - Metadata trust order is **cineplexx → cinestar → tuck → arena**: Arena's film
   page is positional prose that yields the *director* when a film has no
   original title, and it rounds runtimes. Tuck labels its fields explicitly
@@ -171,8 +179,15 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   `showtime--dubbed` / `showtime--original` border tints read as a status
   signal, not a language one, and nothing on the page explained them; the
   audio is already written on the chip (R-8.3) and filterable (R-7.1a). The
-  grace-window muting of R-7c.2a is now the only border variation a chip has,
+  grace-window muting of R-7c.2a is still the only border variation a chip has,
   which is what makes it legible. `data-audio` stays — the filter reads it.
+- **A premium screen is accented on the word, not the border** (R-8.3b).
+  IMAX / 4DX / ScreenX / Gold / VIP get `showtime--premium` plus a
+  `.showtime__format` span, and the card badge gets `badge--premium`. This is
+  not a re-run of R-8.3a: it is binary rather than four-valued, it sits on the
+  very word it describes so it needs no legend, and it deliberately leaves the
+  border to R-7c.2a. Colouring the border here would put both signals in one
+  channel and neither would survive.
 - A badge's classes go on the single outermost element, never on a `<span>`
   nested inside a wrapping `<a>`. `.badges` is a flex row with the default
   `align-items: stretch`, so only a direct flex child gets stretched to match

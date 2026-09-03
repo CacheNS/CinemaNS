@@ -66,3 +66,16 @@ test('the worker never fills its cache through the HTTP cache', async () => {
     'a bare fetch(request) reintroduces the stale-bytes bug; wrap it in a Request with a cache mode',
   );
 });
+
+// R-7c.2b. A screening inside the grace window is still shown, but its seats
+// are off sale, so the chip must stop being a link. Only the browser knows the
+// time, so the server ships a real href and app.js takes it away — which makes
+// this a one-line change away from silently reverting.
+test('a started showtime chip loses its href', async () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const source = await readFile(path.join(root, 'src', 'render', 'assets', 'app.js'), 'utf8');
+
+  assert.match(source, /data-href/, 'the original href must be stashed, not discarded');
+  assert.match(source, /removeAttribute\('href'\)/, 'a started chip must not stay clickable');
+  assert.match(source, /aria-disabled/, 'assistive tech needs the same signal as the muting');
+});

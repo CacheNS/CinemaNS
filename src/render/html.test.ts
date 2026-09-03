@@ -427,9 +427,26 @@ test('pairs each format with its audio version', () => {
   const today = renderDayPage(snapshot, '2026-08-19');
   assert.ok(today.includes('2D · sinhronizovano'));
   assert.ok(today.includes('3D · titlovano'));
-  // Showtime chips use the short form so they stay narrow on phones.
-  assert.ok(today.includes('2D · sinh.'));
-  assert.ok(today.includes('3D · titl.'));
+  // Showtime chips use the short form so they stay narrow on phones. The
+  // format is its own span so a premium screen can be accented on its own.
+  assert.ok(today.includes('<span class="showtime__format">2D</span> · sinh.'));
+  assert.ok(today.includes('<span class="showtime__format">3D</span> · titl.'));
+});
+
+test('marks a premium screen on the chip and on the card badge', () => {
+  const premium = structuredClone(snapshot);
+  premium.movies.find((movie) => movie.key === 'tmdb:3')!.showtimes[0]!.format = 'IMAX 3D';
+
+  const today = renderDayPage(premium, '2026-08-19');
+  assert.ok(today.includes('class="showtime showtime--premium"'));
+  assert.ok(today.includes('data-format="IMAX 3D"'));
+  assert.ok(today.includes('badge--premium'));
+  // The accent is opt-in: an ordinary chip keeps the bare class.
+  assert.ok(today.includes('class="showtime"'));
+  // Started-ness is only knowable in the browser, so the server still ships a
+  // real link and app.js takes the href away (R-7c.2b).
+  assert.ok(!today.includes('data-started="1"'));
+  assert.match(today, /<a class="showtime showtime--premium"\s+href="https:\/\//);
 });
 
 test('colour-codes the running time', () => {

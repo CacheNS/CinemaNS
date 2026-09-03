@@ -5,6 +5,7 @@ import {
   cleanTitle,
   detectAudio,
   detectFormat,
+  isPremiumFormat,
   normalizeTitle,
   similarity,
   tidyDisplayTitle,
@@ -51,10 +52,26 @@ test('detects dubbing only from explicit markers', () => {
 });
 
 test('detects projection format', () => {
-  assert.equal(detectFormat('4DX/3D/TITL'), '4DX');
   assert.equal(detectFormat('3D/TITL'), '3D');
   assert.equal(detectFormat('SCREENX/TITL'), 'ScreenX');
   assert.equal(detectFormat('TITL'), '2D');
+});
+
+// R-10.2: this returned a bare "4DX" until the premium ladder was shared with
+// CineStar, silently dropping the glasses from every Cineplexx/Arena/Tuck chip.
+test('a premium format composes with 3D rather than replacing it', () => {
+  assert.equal(detectFormat('4DX/3D/TITL'), '4DX 3D');
+  assert.equal(detectFormat('IMAX 3D'), 'IMAX 3D');
+  assert.equal(detectFormat('SCREENX/3D'), 'ScreenX 3D');
+  assert.equal(detectFormat('4DX/TITL'), '4DX');
+  assert.equal(detectFormat('Spajdermen: Novi dan 3D'), '3D');
+});
+
+test('isPremiumFormat reads the leading screen, not the dimension', () => {
+  assert.equal(isPremiumFormat('4DX 3D'), true);
+  assert.equal(isPremiumFormat('IMAX'), true);
+  assert.equal(isPremiumFormat('3D'), false);
+  assert.equal(isPremiumFormat('2D'), false);
 });
 
 test('toSerbianLatin keeps the diacritics that transliterate() folds', () => {

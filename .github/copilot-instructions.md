@@ -37,8 +37,9 @@ build timestamp is the only exact freshness claim.
 - **Today's page keeps a screening for 60 minutes after it starts**, then hides
   it — in the browser, Belgrade time, today only (`GRACE_MINUTES`, R-7c.2). You
   can still walk into a film that began twenty minutes ago. Chips inside that
-  window are muted via `data-started` so the reader can tell (R-7c.2a); never
-  strike them through, they are working booking links. The chains disagree about
+  window are muted via `data-started` so the reader can tell (R-7c.2a) and
+  **lose their `href`** (R-7c.2b) — never strike them through, but do not leave
+  them clickable either: those seats are off sale. The chains disagree about
   how much of the past they publish, so this consistency is our rule, not
   theirs — and late in the evening today's page legitimately goes empty.
 - **`CinemaId` is a venue, not a chain.** Beograd has five Cineplexx venues;
@@ -80,6 +81,9 @@ These look like trivia, but each one was a real bug. See §10 of
 `REQUIREMENTS.md` for the full list and evidence.
 
 - Premium formats compose with 3D: `4DX/3D/TITL` is `"4DX 3D"`, not `"4DX"`.
+  One ordered ladder in `core/titles.ts` backs both `detectFormat()` (prose) and
+  CineStar's `formatFromCode()` (codes) — `detectFormat()` used to return on
+  first match and dropped the 3D everywhere but CineStar (R-10.2).
 - Arena's detail block is positional prose, so a film with no original title
   shows its **director** in that slot. Arena also **rounds** runtimes. Hence the
   metadata trust order **cineplexx → cinestar → tuck → arena**: Tuck labels its
@@ -139,7 +143,7 @@ These look like trivia, but each one was a real bug. See §10 of
 
 ## Working in this repo
 
-- `npm test` (152 tests, no network — fixtures only) and `npx tsc --noEmit` must
+- `npm test` (175 tests, no network — fixtures only) and `npx tsc --noEmit` must
   both pass before committing.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.
@@ -154,8 +158,11 @@ These look like trivia, but each one was a real bug. See §10 of
   `showtime--dubbed` (green) / `showtime--original` (violet) borders looked
   like a status flag rather than a language cue and were unexplained on the
   page. Audio is already spelled out on every chip and is filterable, so the
-  tint carried no information. The grace-window muting (R-7c.2a) is now a
-  chip's only border variation. Keep `data-audio` — the filter needs it.
+  tint carried no information. Keep `data-audio` — the filter needs it.
+- **A premium screen is accented on the format word, never the border**
+  (R-8.3b) — `showtime--premium` + a `.showtime__format` span, plus
+  `badge--premium` on the card. The border stays reserved for the grace-window
+  muting (R-7c.2a), which is only legible because it is the sole variation.
 - A badge's classes belong on the single outermost element, never on a `<span>`
   nested inside a wrapping `<a>`. `.badges` is a flex row with the default
   `align-items: stretch`, so only a direct flex child stretches to match its

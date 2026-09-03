@@ -1,7 +1,13 @@
 import * as cheerio from 'cheerio';
 import { fetchText, mapLimit } from '../core/http.js';
 import { normalizeTime } from '../core/dates.js';
-import { cleanTitle, detectAudio, detectFormat } from '../core/titles.js';
+import {
+  cleanTitle,
+  composeFormat,
+  detectAudio,
+  detectFormat,
+  premiumFromTokens,
+} from '../core/titles.js';
 import type { AdapterResult, Audio, CinemaId, RawMovie, Showtime } from '../core/types.js';
 
 const ORIGIN = 'https://cinestarcinemas.rs';
@@ -51,22 +57,7 @@ export function audioFromFormatCode(code: string): Audio {
 
 export function formatFromCode(code: string): string {
   const parts = code.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
-
-  // A screening can be both a premium format and 3D ("4DX/3D/TITL"), and the
-  // glasses are the part people care about, so neither may be dropped.
-  const premium = parts.includes('4DX')
-    ? '4DX'
-    : parts.includes('SCREENX')
-      ? 'ScreenX'
-      : parts.includes('IMAX')
-        ? 'IMAX'
-        : parts.includes('GOLD')
-          ? 'Gold'
-          : undefined;
-
-  const dimension = parts.includes('3D') ? '3D' : undefined;
-  if (premium && dimension) return `${premium} 3D`;
-  return premium ?? dimension ?? '2D';
+  return composeFormat(premiumFromTokens(parts), parts.includes('3D'));
 }
 
 export function parseCinestar(

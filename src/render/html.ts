@@ -4,7 +4,7 @@ import { formatDayLabel, formatDayShort, formatTimestamp } from '../core/dates.j
 import { DEFAULT_LANG, LANGS, LOCALES, STRINGS, otherLang, translateGenre } from '../core/i18n.js';
 import type { Lang, Strings } from '../core/i18n.js';
 import { trailerLink } from '../core/trailer.js';
-import { toSerbianLatin, transliterate } from '../core/titles.js';
+import { isPremiumFormat, toSerbianLatin, transliterate } from '../core/titles.js';
 import { CINEMAS, CITIES, DEFAULT_CITY, cityById } from '../core/types.js';
 import type { Movie, Showtime, Snapshot } from '../core/types.js';
 
@@ -265,19 +265,21 @@ function renderShowtime(showtime: Showtime, t: Strings): string {
   // own programme is the sanctioned fallback (§8.1a), and it comes from our
   // static registry rather than from a scrape.
   const href = safeUrl(showtime.bookingUrl) ?? safeUrl(cinema.url) ?? '#';
+  const premium = isPremiumFormat(showtime.format) ? ' showtime--premium' : '';
 
   return `
-        <a class="showtime"
+        <a class="showtime${premium}"
            href="${href}"
            rel="noopener nofollow"
            target="_blank"
            data-audio="${showtime.audio}"
+           data-format="${escapeHtml(showtime.format)}"
            data-time="${escapeHtml(showtime.time)}"
            title="${escapeHtml(`${cinema.name} · ${details.join(' · ')}`)}">
           <span class="showtime__time">${escapeHtml(showtime.time)}</span>
-          <span class="showtime__meta">${escapeHtml(
-            `${showtime.format} · ${audioShort(showtime.audio, t)}`,
-          )}</span>
+          <span class="showtime__meta"><span class="showtime__format">${escapeHtml(
+            showtime.format,
+          )}</span> · ${escapeHtml(audioShort(showtime.audio, t))}</span>
         </a>`;
 }
 
@@ -469,9 +471,11 @@ function renderMovie(movie: Movie, date: string, t: Strings, lang: Lang): string
           ${variants
             .map(
               (variant) =>
-                `<span class="badge badge--variant badge--${variant.audio}">${escapeHtml(
-                  variant.format,
-                )} · ${escapeHtml(audioLabel(variant.audio, t))}</span>`,
+                `<span class="badge badge--variant badge--${variant.audio}${
+                  isPremiumFormat(variant.format) ? ' badge--premium' : ''
+                }">${escapeHtml(variant.format)} · ${escapeHtml(
+                  audioLabel(variant.audio, t),
+                )}</span>`,
             )
             .join('\n          ')}
         </div>

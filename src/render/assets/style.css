@@ -414,6 +414,14 @@ main {
 
 .badge--variant { color: var(--muted); }
 
+/* A premium screen changes the price and the room, so it is worth spotting in
+   a row of pills; the accent sits on the word, never on the border. */
+.badge--premium {
+  color: var(--accent);
+  border-color: rgba(255, 201, 77, 0.45);
+  font-weight: 600;
+}
+
 .badge--runtime { font-weight: 600; }
 .badge--runtime-short {
   color: #6ee7a8;
@@ -481,14 +489,28 @@ main {
 .showtime__time { font-size: 0.92rem; font-weight: 600; }
 .showtime__meta { font-size: 0.65rem; color: var(--muted); }
 
+/* Only the format word is accented: the border is reserved for the
+   grace-window signal below, which stays legible by being the sole one. */
+.showtime--premium .showtime__format {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Already started, still inside the grace window - muted, but not struck
-   through: the chip is a working booking link and often still sells. */
+   through: the chip still tells you what is playing, it just no longer links
+   anywhere, because those seats are off sale. */
 .showtime[data-started] {
   opacity: 0.55;
   border-style: dashed;
+  cursor: default;
 }
 
-.showtime[data-started]:hover { opacity: 1; }
+/* The hover accent would promise a booking page that cannot sell this
+   screening, so only the legibility bump survives. */
+.showtime[data-started]:hover {
+  opacity: 1;
+  border-color: var(--border);
+}
 
 .footer {
   max-width: 1080px;

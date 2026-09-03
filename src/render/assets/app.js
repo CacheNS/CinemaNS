@@ -99,14 +99,25 @@
   // Kept in the rendered HTML so this file carries no display copy of its own.
   var startedLabel = container.getAttribute('data-started-label') || '';
 
-  /** Flags a screening that has begun but is still inside the grace window. */
+  /**
+   * Flags a screening that has begun but is still inside the grace window, and
+   * takes its href away: the chip stays readable, but those seats are no longer
+   * on sale, so a link would lead to a booking page that cannot serve it.
+   */
   function markStarted(showtime, started) {
     if (started === showtime.hasAttribute('data-started')) return;
     if (started) {
       showtime.setAttribute('data-started', '1');
+      showtime.setAttribute('data-href', showtime.getAttribute('href') || '');
+      showtime.removeAttribute('href');
+      showtime.setAttribute('aria-disabled', 'true');
       if (startedLabel) showtime.title += ' · ' + startedLabel;
     } else {
       showtime.removeAttribute('data-started');
+      var href = showtime.getAttribute('data-href');
+      if (href) showtime.setAttribute('href', href);
+      showtime.removeAttribute('data-href');
+      showtime.removeAttribute('aria-disabled');
       if (startedLabel) showtime.title = showtime.title.replace(' · ' + startedLabel, '');
     }
   }
