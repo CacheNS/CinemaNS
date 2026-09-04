@@ -15,21 +15,23 @@ export type CinemaId =
   | 'cineplexx-beo'
   | 'cineplexx-galerija'
   | 'cinestar-beograd-ada'
-  | 'tuck-beograd';
+  | 'tuck-beograd'
+  | 'roda-beograd';
 
 /** The operator. Metadata trust is a property of the chain, not the venue. */
-export type Chain = 'arena' | 'cineplexx' | 'cinestar' | 'tuck';
+export type Chain = 'arena' | 'cineplexx' | 'cinestar' | 'tuck' | 'roda';
 
 export type CityId = 'novi-sad' | 'beograd';
 
 /**
- * How to scrape a venue. Arena carries no parameter because its whole site is
- * one cinema; the other two are addressed by the identifier their own site
- * uses. Tuck also carries no parameter — like Arena, it is a single venue with
- * no location selector.
+ * How to scrape a venue. Arena and Roda share the `artvista` parser — same
+ * operator, same CMS, different city — and carry no parameter because each
+ * whole site is one cinema; the adapter resolves its origins from the venue id.
+ * The other two are addressed by the identifier their own site uses, and Tuck
+ * is likewise a single venue with no location selector.
  */
 export type CinemaSource =
-  | { kind: 'arena' }
+  | { kind: 'artvista' }
   | { kind: 'cineplexx'; urlName: string }
   | { kind: 'cinestar'; slug: string }
   | { kind: 'tuck' };
@@ -63,7 +65,7 @@ export const CINEMAS: Record<CinemaId, Cinema> = {
     name: 'Arena Cineplex Centar',
     shortName: 'Arena Centar',
     url: 'http://www.arenacineplex.com/',
-    source: { kind: 'arena' },
+    source: { kind: 'artvista' },
   },
   'cineplexx-novi-sad': {
     id: 'cineplexx-novi-sad',
@@ -146,6 +148,15 @@ export const CINEMAS: Record<CinemaId, Cinema> = {
     url: 'https://www.tuck.rs/',
     source: { kind: 'tuck' },
   },
+  'roda-beograd': {
+    id: 'roda-beograd',
+    chain: 'roda',
+    city: 'beograd',
+    name: 'Roda Cineplex',
+    shortName: 'Roda Cineplex',
+    url: 'http://www.rodacineplex.com/',
+    source: { kind: 'artvista' },
+  },
 };
 
 export const CITIES: City[] = [
@@ -169,6 +180,7 @@ export const CITIES: City[] = [
       'cineplexx-beo',
       'cinestar-beograd-ada',
       'tuck-beograd',
+      'roda-beograd',
     ],
   },
 ];

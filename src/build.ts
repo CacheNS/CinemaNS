@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { scrapeArena } from './adapters/arena.js';
+import { scrapeArtVista } from './adapters/artvista.js';
 import { scrapeCineplexx } from './adapters/cineplexx.js';
 import { scrapeCinestar } from './adapters/cinestar.js';
 import { scrapeTuck } from './adapters/tuck.js';
@@ -40,8 +40,8 @@ const SCRAPERS: Record<CinemaId, (days: string[]) => Promise<{ movies: RawMovie[
       const { source } = CINEMAS[id];
       const scrape = (days: string[]): Promise<{ movies: RawMovie[] }> => {
         switch (source.kind) {
-          case 'arena':
-            return scrapeArena(days);
+          case 'artvista':
+            return scrapeArtVista(days, id);
           case 'cineplexx':
             return scrapeCineplexx(days, id, source.urlName);
           case 'cinestar':

@@ -23,6 +23,8 @@ const METADATA_TRUST: Record<Chain, number> = {
   cinestar: 1,
   tuck: 2,
   arena: 3,
+  // Same positional prose as Arena, since it is the same CMS, and newer here.
+  roda: 4,
 };
 
 function byMetadataTrust(raws: RawMovie[]): RawMovie[] {

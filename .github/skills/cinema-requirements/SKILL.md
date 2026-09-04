@@ -25,7 +25,7 @@ overwritten commit later.
 ## Orientation
 
 Static site → built by scheduled GitHub Actions → served by GitHub Pages. A
-Node.js + TypeScript build scrapes ten venues across two cities in parallel,
+Node.js + TypeScript build scrapes eleven venues across two cities in parallel,
 enriches via TMDb, merges by movie, and emits one Serbian HTML page per day plus `data.json`.
 
 The cron asks for hourly but GitHub delivers **2-6 runs a day** (mean gap 4.3 h,
@@ -63,7 +63,9 @@ claim an hourly refresh** (R-2.6a).
    visible — do not relabel it "Titlovano" and do not make it hide `unknown`
    (§7.1b). The unknown-language notice belongs to the dubbed state alone
    (§7.8). There is no `?dubbed=1` fallback; do not add one back.
-4. **Metadata trust order is cineplexx → cinestar → tuck → arena** (§10.3).
+4. **Metadata trust order is cineplexx → cinestar → tuck → arena → roda**
+   (§10.3). Arena's detail block is positional prose and rounds runtimes; Roda
+   runs the same CMS, so it inherits the weakness and sits last.
    Arena's film page is positional prose, so it yields the *director* when a
    film has no original title, and it rounds runtimes. Tuck labels its fields
    explicitly like Cineplexx/CineStar, so it outranks Arena but stays below
@@ -142,8 +144,13 @@ claim an hourly refresh** (R-2.6a).
     (§7b.4). This is the one place a no-JS superset is *wrong* rather than
     merely broad: a Novi Sad reader must never see Belgrade showtimes. Counts,
     empty state, subtitle and stale-source notices are all per city (§7b.5).
-20. **Arena exists only in Novi Sad** (§1.2.1) — its site has no location
-    selector at all. Do not try to parameterize it by city.
+20. **Arena exists only in Novi Sad and Roda only in Beograd** (§1.2.1–1.2.1a) —
+    neither site has a location selector. Do not parameterize either by city.
+    They are one operator on one CMS, so they **share** `adapters/artvista.ts`
+    via an `ArtVistaVenue` config (§15.7a) while keeping separate `CinemaId`s
+    and `Chain`s. Leave no venue-specific constant or function name behind:
+    `parseArenaShowtimes(rodaHtml)` would read as correct. Roda's ticket host
+    is upgraded to HTTPS, unlike Tuck's (§17.6c).
 21. **`safeUrl()` guards every `href`/`src`, and the page has a strict CSP**
     (§17.8–17.9). `escapeHtml` does not stop `javascript:` — there is nothing in
     it to escape. Tab, newline and CR are stripped before the scheme/`//`
@@ -215,7 +222,7 @@ claim an hourly refresh** (R-2.6a).
 
 ```
 npx tsc --noEmit
-npm test          # 177 tests, fixtures only, no network
+npm test          # 185 tests, fixtures only, no network
 npm run build     # scrapes live, writes dist/
 npm run serve     # http://localhost:3000
 ```

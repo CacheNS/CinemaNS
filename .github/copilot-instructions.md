@@ -9,8 +9,8 @@ in commit messages and PR descriptions when a change touches them.
 ## What this is
 
 A static site, rebuilt by GitHub Actions and served by GitHub Pages, that
-scrapes and merges showtimes from **ten cinema venues across Novi Sad and
-Beograd** (Arena, Cineplexx, CineStar, Tuck), enriches them via TMDb, and
+scrapes and merges showtimes from **eleven cinema venues across Novi Sad and
+Beograd** (Arena, Cineplexx, CineStar, Tuck, Roda), enriches them via TMDb, and
 renders one Serbian-language HTML page per day. The app is named **Kokice**;
 the repository keeps its old name on purpose until the domain move (R-13.8).
 
@@ -86,9 +86,16 @@ These look like trivia, but each one was a real bug. See §10 of
   first match and dropped the 3D everywhere but CineStar (R-10.2).
 - Arena's detail block is positional prose, so a film with no original title
   shows its **director** in that slot. Arena also **rounds** runtimes. Hence the
-  metadata trust order **cineplexx → cinestar → tuck → arena**: Tuck labels its
-  fields explicitly like Cineplexx/CineStar, so it outranks Arena but stays
-  below the two longer-audited sources.
+  metadata trust order **cineplexx → cinestar → tuck → arena → roda**: Tuck
+  labels its fields explicitly like Cineplexx/CineStar, so it outranks Arena but
+  stays below the two longer-audited sources; Roda runs Arena's CMS and inherits
+  its weakness, so it sits last.
+- **Arena and Roda share one parser, `adapters/artvista.ts`** (R-15.7a) — one
+  operator, one CMS, two cities. An `ArtVistaVenue` config supplies the origins
+  and the `CinemaId`; never leave a venue-specific constant or function name
+  behind, since `parseArenaShowtimes(rodaHtml)` reads as if it were right.
+  Roda's ticket host **is** upgraded to HTTPS (measured), unlike Tuck's
+  (R-17.6c).
 - Arena's detail rows run together (`RSGodina proizvodnje`), so parse by reading
   the `<strong>` label's own container, not with a regex over the body text.
 - `DS` in an Arena title is **not** a dubbing marker.
@@ -143,8 +150,9 @@ These look like trivia, but each one was a real bug. See §10 of
 
 ## Working in this repo
 
-- `npm test` (177 tests, no network — fixtures only) and `npx tsc --noEmit` must
-  both pass before committing.
+- `npm test` (185 tests, no network — fixtures only) and `npx tsc --noEmit` must
+  both pass before committing. After renaming a source file, delete `lib/`
+  first — `tsc` does not prune it, so the old compiled test keeps running.
 - `npm run build` scrapes live and writes `dist/`; `npm run serve` serves it on
   localhost:3000.
 - Adapters stay isolated with fixture-based tests, so a site's HTML change

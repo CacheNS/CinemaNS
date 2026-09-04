@@ -11,10 +11,10 @@ For the condensed version, see
 ## What this is
 
 A static site, rebuilt by GitHub Actions and served by GitHub Pages, that
-scrapes and merges movie showtimes from **ten cinema venues across Novi Sad and
-Beograd**, enriches them via TMDb, and renders one Serbian-language page per day
-plus a reusable `data.json`. The app is called **Kokice**; the repository keeps
-its old name deliberately (R-13.8).
+scrapes and merges movie showtimes from **eleven cinema venues across Novi Sad
+and Beograd**, enriches them via TMDb, and renders one Serbian-language page per
+day plus a reusable `data.json`. The app is called **Kokice**; the repository
+keeps its old name deliberately (R-13.8).
 
 The cron asks for hourly, but GitHub dispatches it **2-6 times a day** (measured
 2026-09-02 across 220 runs: mean gap 4.3 h, and only one run fired at the
@@ -26,7 +26,7 @@ exact freshness claim.
 ## Commands
 
 ```
-npm test          # 177 tests, fixtures only, no network
+npm test          # 185 tests, fixtures only, no network
 npx tsc --noEmit  # must be clean
 npm run build     # scrapes live, writes dist/
 npm run serve     # serves dist/ on http://localhost:3000
@@ -103,11 +103,12 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
   `detectFormat()` and CineStar's `formatFromCode()` — before that,
   `detectFormat()` returned on first match and dropped the 3D from every
   Cineplexx/Arena/Tuck chip (R-10.2).
-- Metadata trust order is **cineplexx → cinestar → tuck → arena**: Arena's film
-  page is positional prose that yields the *director* when a film has no
+- Metadata trust order is **cineplexx → cinestar → tuck → arena → roda**: Arena's
+  film page is positional prose that yields the *director* when a film has no
   original title, and it rounds runtimes. Tuck labels its fields explicitly
   like Cineplexx/CineStar, so it outranks Arena but stays below the two
-  longer-audited sources.
+  longer-audited sources. Roda runs Arena's CMS, so it inherits the same
+  weakness and sits last.
 - Parse Arena's detail rows via the `<strong>` label's own container — the rows
   run together (`RSGodina proizvodnje`), so a body-text regex fails.
 - `DS` in an Arena title is not a dubbing marker.
@@ -143,8 +144,18 @@ Both `npm test` and `npx tsc --noEmit` must pass before committing.
 - Cineplexx venue numbers are resolved from `/api/v1/cinemas` by `cinemaUrlName`
   at scrape time. Never hardcode them: the live ids are non-contiguous (`1114`
   and `1117` do not exist), so an assumed id silently scrapes the wrong cinema.
-- Arena exists only in Novi Sad — its site has no location selector at all. Do
-  not try to parameterize it by city.
+- **Arena and Roda share one parser, `adapters/artvista.ts`** (R-15.7a) — same
+  operator (Art Vista), same CMS, same date-tab quirk, same run-on detail rows,
+  same `numSale/index/<id>` ticket links. An `ArtVistaVenue` config carries the
+  origins and the `CinemaId`; nothing venue-specific may sit in a constant or a
+  function name, since `parseArenaShowtimes(rodaHtml)` would read as correct.
+  They stay separate `CinemaId`s and separate `Chain`s.
+- Arena exists only in Novi Sad and Roda only in Beograd — neither site has a
+  location selector. Do not try to parameterize either by city.
+- **Roda's ticket host is upgraded to HTTPS, unlike Tuck's** (R-17.6c).
+  Measured: `https://www.rodacineplex.com` will not connect, but
+  `https://ulaznice.rodacineplex.com/…/numSale/index/<id>` answers. So Roda
+  follows Arena's rule, not Tuck's.
 
 ## Analytics (§16)
 

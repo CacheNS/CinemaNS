@@ -22,6 +22,17 @@ export const FIXTURE_DAYS = [
   '2026-08-26',
 ];
 
+/** The Roda fixtures were captured later, so they need their own window. */
+export const RODA_FIXTURE_DAYS = [
+  '2026-09-03',
+  '2026-09-04',
+  '2026-09-05',
+  '2026-09-06',
+  '2026-09-07',
+  '2026-09-08',
+  '2026-09-09',
+];
+
 export function assertValidShowtimes(
   showtimes: { date: string; time: string; bookingUrl: string }[],
   days: string[] = FIXTURE_DAYS,

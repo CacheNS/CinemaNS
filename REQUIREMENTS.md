@@ -14,7 +14,7 @@ Each requirement has a stable id (`R-*`) so changes can reference it.
 **R-1.1** One page that shows what is playing in a chosen city's cinemas, merged
 across all of that city's cinemas and grouped by movie.
 
-**R-1.2** Covers exactly ten venues across two cities. Venue coverage was
+**R-1.2** Covers exactly eleven venues across two cities. Venue coverage was
 verified against the live sites and APIs; it is not a guess.
 
 **Novi Sad**
@@ -36,12 +36,21 @@ verified against the live sites and APIs; it is not a guess.
 | `cineplexx-galerija` | **Cineplexx Galerija** | Cineplexx API |
 | `cinestar-beograd-ada` | **CineStar Ada Mall** | `cinestarcinemas.rs/beograd-concept-cinema-ada-mall` |
 | `tuck-beograd` | **Tuckwood Cineplex** | `tuck.rs/repertoar` (server-rendered HTML) |
+| `roda-beograd` | **Roda Cineplex** | `rodacineplex.com` (server-rendered HTML) |
 
-**R-1.2.1** Arena Cineplex exists **only in Novi Sad** — `arenacineplex.com` has
-no location selector at all, the whole site is one cinema. The cinema set is
-genuinely per-city, not a chain list filtered by city.
+**R-1.2.1** Arena Cineplex exists **only in Novi Sad** — `arenacineplex.com`
+has no location selector at all, the whole site is one cinema. The cinema set
+is genuinely per-city, not a chain list filtered by city.
 
-**R-1.2.2** Niš and Subotica have none of these four chains and cannot be added
+**R-1.2.1a** Arena's operator (Art Vista) also runs **Roda Cineplex** in
+Beograd, on a **separate host** — `rodacineplex.com` — running the identical
+CMS. That does not make Arena a two-city chain: they are two venues with two
+sites, and each site is still one cinema with no location selector. They share
+a parser (`adapters/artvista.ts`, R-15.7a), not an identity: separate
+`CinemaId`s, separate `Chain`s (`arena`, `roda`) and separate origins.
+MOBIL3DCINEMA, the operator's third brand, is out of scope.
+
+**R-1.2.2** Niš and Subotica have none of these five chains and cannot be added
 without an entirely new adapter.
 
 **R-1.3** The cinema's location must always be part of its displayed name
@@ -751,7 +760,8 @@ exact token for CineStar's slash-separated codes. `Gold` still requires the word
 "class" in prose, because a film may simply be titled *Gold*.
 
 **R-10.3 Metadata source ranking.** When cinemas disagree about metadata,
-prefer the more trustworthy source: **cineplexx → cinestar → tuck → arena**.
+prefer the more trustworthy source:
+**cineplexx → cinestar → tuck → arena → roda**.
 Applies to `originalTitle` and `runtimeMinutes`.
 
 Rationale, both confirmed on live pages:
@@ -763,20 +773,26 @@ Rationale, both confirmed on live pages:
   way Cineplexx/CineStar do, so it outranks Arena's positional prose — but it
   is a newer, less-audited source than Cineplexx/CineStar, so it stays below
   them.
+- Roda runs the same CMS as Arena and therefore has the same positional-prose
+  weakness, and it is newer here, so it sits last. Being last costs nothing:
+  it only loses ties, and every film it carries also plays elsewhere.
 
 **R-10.4 Domestic films are labelled `original` ("domaći film")**, never
-"titlovano". The signal is Arena's `Zemlja porekla: RS`.
+"titlovano". The signal is `Zemlja porekla: RS`, published by Arena and Roda.
 
 **R-10.5** The domestic remap is applied at **merge level**, not adapter level,
 so every venue shows the same label for the same film even when only one
 cinema published the country.
 
-**R-10.5.1 The country signal is Novi-Sad-only, so TMDb backs it up.** Only
-Arena publishes `Zemlja porekla`, and Arena has no Beograd venue, so a domestic
-film playing exclusively in Beograd has no country signal at all and would be
-labelled "titlovano". TMDb's `original_language == 'sr'` is therefore accepted
-as a second domestic signal. It is deliberately a *second* signal: with no TMDb
-key the build behaves exactly as before (R-8.1). Serbian only — Croatian and
+**R-10.5.1 The country signal is sparse, so TMDb backs it up.** Only the two
+Art Vista sites publish `Zemlja porekla`. Until Roda was added this meant the
+signal was Novi-Sad-only, so a domestic film playing exclusively in Beograd had
+no country signal at all and would be labelled "titlovano". Roda now supplies
+the same field in Beograd, which narrows the gap but does not close it — it
+carries ~11 films, so a domestic film Roda is not showing is still uncovered,
+and Roda can go down. TMDb's `original_language == 'sr'` therefore remains a
+second domestic signal. It is deliberately a *second* signal: with no TMDb key
+the build behaves exactly as before (R-8.1). Serbian only — Croatian and
 Bosnian films also play untranslated, but "domaći film" would be a false claim
 about them.
 
@@ -879,7 +895,12 @@ started chip (R-7c.2b), since `app.js` has no other test coverage.
 `parseArenaOriginCountry` test passed against simplified HTML while the parser
 was broken on the live page — a test that cannot fail is worse than no test.
 
-**R-12.4** Baseline: **177 tests passing**, `tsc --noEmit` clean.
+**R-12.4** Baseline: **185 tests passing**, `tsc --noEmit` clean.
+
+When a source file is renamed, delete `lib/` before trusting the count: `tsc`
+does not prune its output, so the old compiled test keeps running against the
+old module. The artvista rename briefly showed 197 passing tests — twelve of
+them the Arena suite executing twice, half of it against dead code.
 
 **R-12.5** The city model is covered by tests that would fail if the registry
 drifted: every venue belongs to exactly one city (R-4.9), venues of the same
@@ -1052,6 +1073,18 @@ on the device drags in a consent banner and defeats R-2.1.
 a parameter; if a new city cannot be expressed that way, it needs a new adapter
 (R-1.2.2).
 
+**R-15.7a When two chains share a CMS, they share one adapter, parameterised —
+never a copy.** Arena and Roda are one operator on one platform, so
+`adapters/artvista.ts` holds the parser and an `ArtVistaVenue` config supplies
+the origins and the `CinemaId`; `scrapeArtVista(days, cinemaId)` looks the
+venue up. Copying the file instead would have meant every future Art Vista
+parsing fix had to be found and applied twice, which is how one venue silently
+rots. They still keep separate `CinemaId`s and separate `Chain`s — sharing a
+parser is not sharing an identity (R-1.2.1a).
+
+The renaming is deliberate: nothing venue-specific may remain in a name or a
+constant, because `parseArenaShowtimes(rodaHtml)` reads as if it were correct.
+
 **R-15.8** Anything rendered per city must be pre-hidden for every city but the
 default, and JS must only ever reveal (R-7b.4). A new per-city element that
 defaults to visible is a no-JS correctness bug, not a cosmetic one.
@@ -1196,6 +1229,21 @@ host, there is no working HTTPS endpoint to upgrade to, so the allow-list
 keeps the link on plain HTTP rather than producing a dead `https://` chip.
 Anything off those two origins is dropped and falls back to the programme
 page, same as Arena/CineStar.
+
+**R-17.6c Roda's origins are allow-listed by the same code path as Arena's, and
+its ticket host *is* upgraded.** `artVistaUrl()` takes the venue config, so
+`roda-beograd` resolves scraped hrefs against `http://www.rodacineplex.com` and
+`https://ulaznice.rodacineplex.com` only. Measured before the rule was written:
+`https://www.rodacineplex.com` fails to connect (like Arena, the programme site
+is HTTP-only), while `https://ulaznice.rodacineplex.com/rs/site/numSale/index/
+<id>` answers with the same 302 into the booking flow as the `http://` form.
+So Roda follows R-17.6, **not** R-17.6b — the HTTPS endpoint exists, so the
+booking link is upgraded rather than left plain.
+
+Because the two venues now share one function, the origins must come from the
+venue config and never from a module constant; a test parses Arena's markup as
+Roda and asserts every resulting URL lands on Roda's origins, which fails if an
+Arena literal is left behind.
 
 **R-17.7 Titles are capped at 300 characters before parsing.** The noise-
 stripping regexes are quadratic — measured, not assumed: 64 KB takes ~0.7 s and
